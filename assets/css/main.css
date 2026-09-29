@@ -360,6 +360,30 @@ table.tbl { width:100%; border-collapse:separate; border-spacing:0; font-size:13
 .dh-hint { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--muted); background:color-mix(in srgb, var(--panel-solid) 70%, transparent); padding:5px 12px; border-radius:999px; border:1px solid var(--line); pointer-events:none; z-index:3; white-space:nowrap; }
 .dh-sun { position:absolute; width:18px; height:18px; border-radius:50%; background:radial-gradient(circle, #fff6d6, #EBCB8B 55%, transparent 70%); box-shadow:0 0 40px 18px rgba(235,203,139,.35); pointer-events:none; }
 
+
+/* Rendered floor-plan plates (dollhouse) */
+.dh-img { display:block; pointer-events:none; user-select:none; -webkit-user-drag:none; filter: drop-shadow(0 10px 14px rgba(0,0,0,.45)); }
+.dh-plate .dh-room { mix-blend-mode: multiply; opacity:.82; border-radius:4px; box-shadow:none; }
+.dh-plate .dh-room:hover, .dh-plate .dh-room.sel { mix-blend-mode: normal; opacity:.92; transform: translateZ(14px); box-shadow: 0 0 0 2px #2E3440, 0 18px 30px -8px rgba(0,0,0,.55); }
+.dh-plate .dh-room .lbl { color:#1d2129; text-shadow:none; }
+.dh-plate .dh-room .lbl b { font-size:14px; }
+.dh-floor.yard .dh-box > i { border-color: rgba(0,0,0,.25); }
+/* Exterior hero with live callouts */
+.xhero { position:relative; perspective:1400px; padding:40px 0 30px; }
+.xhero-stage { position:relative; transform-style:preserve-3d; transition:transform .25s ease-out; will-change:transform; }
+.xhero img.bld { width:100%; display:block; filter: drop-shadow(0 30px 40px rgba(0,0,0,.55)); transition: filter 2s; user-select:none; -webkit-user-drag:none; }
+.xhero .reflect { position:absolute; left:4%; right:4%; bottom:-6%; height:22%; background:radial-gradient(closest-side, rgba(0,0,0,.45), transparent); filter:blur(8px); transform:translateZ(-40px); pointer-events:none; }
+.xhero .night { position:absolute; inset:0; pointer-events:none; mix-blend-mode:multiply; background:linear-gradient(#1b2340, #2b3350); opacity:0; transition:opacity 2s; -webkit-mask: var(--bldmask) center/100% 100% no-repeat; mask: var(--bldmask) center/100% 100% no-repeat; }
+.pin { position:absolute; transform: translate(-50%, -100%) translateZ(60px); display:flex; flex-direction:column; align-items:center; pointer-events:auto; cursor:pointer; }
+.pin .chip { background:color-mix(in srgb, var(--panel-solid) 88%, transparent); backdrop-filter:var(--glass-blur); border:1px solid var(--line-2); border-radius:10px; padding:5px 9px; font-size:11px; color:var(--muted); white-space:nowrap; box-shadow:var(--shadow); transition:transform .2s, border-color .2s; }
+.pin .chip b { display:block; font:650 15px var(--mono); color:var(--text); }
+.pin:hover .chip { transform:translateY(-3px); border-color:var(--accent); }
+.pin .stem { width:1px; height:34px; background:linear-gradient(var(--accent), transparent); }
+.pin .dot { width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 var(--accent); animation:pinPulse 2.2s infinite; margin-top:-2px; }
+.pin.st-alarm .chip { border-color:var(--alarm); } .pin.st-alarm .dot { background:var(--alarm); }
+@keyframes pinPulse { 0% { box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); } 100% { box-shadow:0 0 0 14px transparent; } }
+@media (max-width: 860px) { .pin-opt { display:none !important; } .pin .chip { font-size:9.5px; padding:3px 6px; } .pin .chip b { font-size:12px; } .pin .stem { height:18px; } }
+
 /* Hero (home) */
 .hero { position:relative; display:grid; grid-template-columns: minmax(0,1.05fr) minmax(0,1fr); gap:10px; align-items:center; min-height:560px; margin:-6px 0 18px; }
 .hero h1 { font-size: clamp(34px, 4.2vw, 62px); line-height:1.02; letter-spacing:-.035em; font-weight:750; }

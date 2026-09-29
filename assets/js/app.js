@@ -3,7 +3,7 @@
 import { $, $$, h, fmt, icon, ICONS, store, clamp } from './util.js';
 import { sim, pts, pv, write, relinquish, setOOS, fmtPV, objectId, activePriority, isOverridden, PRIORITY_NAMES, DEVICES, TYPES, on, warmup, startSim, setSpeed, unacked, searchPoints, ALARM_CLASS } from './sim.js';
 import { wx, startWeather, onWeather, WMO } from './weather.js';
-import { ZONES, BUILDING } from './building.js';
+import { ZONES, BUILDING, FLOORS } from './building.js';
 import { spark } from './charts.js';
 
 // ---------- Theme ----------------------------------------------------------------
@@ -36,7 +36,7 @@ function shell() {
   <div class="app">
     <header class="hdr">
       <button class="hdr-btn menu-btn" id="menuBtn" aria-label="Menu">${ICONS.menu}</button>
-      <a class="brand" href="#/">${LOGO}<span class="t">Meridian Tower<small>Building Automation</small></span></a>
+      <a class="brand" href="#/">${LOGO}<span class="t">Meridian Center<small>Building Automation</small></span></a>
       <div class="hdr-spacer"></div>
       <div class="hdr-chip hide-sm" title="Simulated controller clock — speed up with the time-lapse buttons"><span class="demo-badge">DEMO</span><b id="clk">--:--</b><span class="lbl" id="clkd"></span></div>
       <div class="speed hide-md" role="group" aria-label="Simulation speed">${[1, 10, 60].map(x => `<button data-speed="${x}">${x}×</button>`).join('')}</div>
@@ -62,7 +62,7 @@ function buildNav() {
     out.push(`<a href="#/${r.path}" data-route="${r.path}">${ICONS[r.icon]}<span>${r.title}</span></a>`);
     if (r.path === 'vavs') {
       out.push(`<details id="vavNav"><summary>${ICONS.box}<span>VAV Boxes</span>${ICONS.caret}</summary><div class="sub">` +
-        [1, 2, 3, 4].map(f => `<details ${f === 2 ? 'open' : ''}><summary>Level ${f}${ICONS.caret}</summary><div class="sub">` +
+        FLOORS.map(({ n: f }) => `<details ${f === 1 ? 'open' : ''}><summary>Level ${f}${ICONS.caret}</summary><div class="sub">` +
           ZONES.filter(z => z.floor === f).map(z => `<a href="#/vav/${z.id}" data-route="vav/${z.id}" title="${z.name}"><i class="dot" data-dot="${z.id}"></i>${z.id.replace('VAV-', '')}<span class="v" data-navt="${z.id}"></span></a>`).join('') + '</div></details>').join('') + '</div></details>');
     }
   }
@@ -243,7 +243,7 @@ async function boot() {
     ['Binding BACnet/IP port <span class="hl">47808 (0xBAC0)</span> on 10.20.1.10', 8],
     ['Broadcasting <span class="hl">Who-Is</span> … received I-Am from 45 devices', 20],
     ['Reading object lists (ReadPropertyMultiple) …', 34],
-    [`Loaded <span class="hl">${pts.size.toLocaleString()}</span> objects · 40 VAV · 1 AHU · 2 plants · 1 meter gateway`, 48],
+    [`Loaded <span class="hl">${pts.size.toLocaleString()}</span> objects · ${ZONES.length} VAV · 1 AHU · 2 plants · 1 meter gateway`, 48],
     ['Subscribing COV · Notification classes 1–5', 60],
     ['Fetching live outdoor conditions (Open-Meteo, NOAA/NWS) …', 72],
   ];

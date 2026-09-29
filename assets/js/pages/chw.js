@@ -67,7 +67,7 @@ export default {
   title: () => 'Chilled Water Plant',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Water Side › Chilled water' }), h('h1', {}, 'Chilled-water plant'),
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Water Side › Chilled water' }), h('h1', {}, 'Chilled-water plant'),
         h('p', {}, 'Variable-primary plant: two 125-ton water-cooled centrifugal chillers, VFD primary pumps, two induced-draft towers. Lead/lag staging on load, CHWS reset on plant load, condenser-water setpoint = wet bulb + 7 °F approach (65 °F floor).')),
       h('div.head-actions', {}, h('span.badge', { id: 'plantB' }))));
     const g = h('div.card.flush.gfx-wrap', { html: graphic() }); view.append(g);

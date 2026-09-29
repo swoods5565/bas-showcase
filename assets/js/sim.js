@@ -1,5 +1,5 @@
 // ============================================================================
-// Meridian Tower — BACnet-style point database + physics-lite simulation
+// Meridian Center — BACnet-style point database + physics-lite simulation
 //  • Every value is a BACnet-like object with a 16-level priority array
 //    (program logic writes @16, operator commands @8), status flags, OOS.
 //  • Sequences are patterned on ASHRAE Guideline 36 (trim & respond resets,
@@ -202,7 +202,7 @@ function demoStart() {
 }
 const st = demoStart();
 export const sim = {
-  t: st.t, shifted: st.shifted, speed: store('speed') || 1, running: true, zones: {}, faults: { 'VAV-2-04': 'Damper actuator stuck at 45 %' },
+  t: st.t, shifted: st.shifted, speed: store('speed') || 1, running: true, zones: {}, faults: { 'VAV-2-04': 'Damper actuator stuck at 15 %' },
   alarms: new Map(), events: [], plant: {}, day: st.t.getDate(), energy: { kwh: 0, thm: 0, gal: 0, peak: 0, dem: [] },
 };
 export function setSpeed(x) { sim.speed = x; store('speed', x); }
@@ -228,7 +228,7 @@ function occFraction(type, s, key) {
 const Z = sim.zones;
 ZONES.forEach((z, i) => { Z[z.id] = { z, tz: 72 + noise(z.id, 1, 1) * 1.2, cfm: z.cfmMin, dat: 58, co2: 520, occ: 0, load: 0, reheat: 0, people: 0 }; });
 const S = sim.plant = { dsp: 1.0, dspSp: 1.0, satT: 57, sat: 56, mat: 60, rat: 74, wra: .0085, wsa: .0080, wma: .008, spd: 60, oaFrac: .2, ccBtu: 0, phBtu: 0, tr: 0, chwst: 44.5, chwrt: 55, cwst: 78, hwst: 140, hwrt: 120, csup: 600, filt: .62, ch2: false, b2: false, chwEn: false, hwEn: false, oat: 70 };
-const DESIGN_CFM = 60000, SF_KW = 42, RF_KW = 14, CH_CAP = 125, B_CAP = 1500000;
+const DESIGN_CFM = BUILDING.designCfm, SF_KW = 42, RF_KW = 14, CH_CAP = 125, B_CAP = 1500000;
 
 function outdoor() {
   const c = wx.cur; let t = c ? c.t : 72, rh = c ? c.rh : 55;
@@ -287,7 +287,7 @@ export function tick(dt = sim.speed) {
       load += glass * ghi * .317 * .36 * (.28 + .9 * inc);
       load += z.facadeLen * BUILDING.floorHeight * .32 * (oat - zs.tz);
     }
-    if (z.floor === BUILDING.floors) load += z.area * .045 * (oat + 12 * (ghi / 900) - zs.tz);
+    if (z.roof) load += z.area * .045 * (oat + 12 * (ghi / 900) - zs.tz);
     zs.load = load;
     // Setpoints (occupied 70/74, unoccupied setback 60/85)
     logic(d + '.ZN-CSP', occMode ? 74 : 85); logic(d + '.ZN-HSP', occMode ? 70 : 60);
@@ -313,6 +313,9 @@ export function tick(dt = sim.speed) {
         }
       }
     }
+    // Feedback: a PI loop saturates when the space is already outside its setpoints
+    if (fanOn && zs.tz > csp + 1) { cfmT = cMax; datT = SAT + .8; clg = 100; htg = 0; md = 1; }
+    else if (fanOn && zs.tz < hsp - 1) { cfmT = hMax; datT = DATMAX; htg = 100; clg = 0; md = 3; }
     logic(d + '.CFM-SP', Math.round(cfmT));
     // Reheat valve: coil capacity scales with HWST and airflow
     const coilCap = 48 * clamp((HWST - SAT) / 85, 0, 1.3) * clamp(cMin / Math.max(cfmT, 1), .45, 1);
@@ -325,7 +328,7 @@ export function tick(dt = sim.speed) {
     const dm = pv(d + '.DMPR');
     // Delivered flow follows commanded damper (so operator overrides of DMPR act physically)
     let cfmTgt = fanOn ? Math.min(cMax * 1.3, cMax * (dm / 100) / .78 * Math.sqrt(Math.max(S.dsp, .05) / 1.0)) : 0;
-    if (fault && fanOn) cfmTgt = cMax * .45 / .78 * Math.sqrt(S.dsp);
+    if (fault && fanOn) cfmTgt = cMax * .15 / .78 * Math.sqrt(S.dsp);
     zs.cfm = lag(zs.cfm, cfmTgt, dt || 1, 12);
     const cfm = zs.cfm + (fanOn ? noise(d + 'f', sim.t.getTime() / 4e3, 1) * 6 : 0);
     const dat = fanOn ? SAT + .8 + pv(d + '.HWV') / 100 * coilCap : zs.tz;
@@ -462,7 +465,7 @@ export function tick(dt = sim.speed) {
   logic('CHW.CW-GPM', cwgpm); logic('CHW.CWP-1-SS', pv('CHW.CH-1-STS')); logic('CHW.CWP-2-SS', pv('CHW.CH-2-STS'));
   logic('CHW.CWST', S.cwst); logic('CHW.CWRT', nCh ? S.cwst + load * 12000 * (1 + kwt * 3412 / 12000) / (500 * cwgpm) : S.cwst);
   [1, 2].forEach(n => { const on = pv(`CHW.CH-${n}-STS`); logic(`CHW.CH-${n}-KW`, on ? chKW / nCh : 0); logic(`CHW.CH-${n}-PLR`, on ? plr * 100 : 0); });
-  const pumpKW = nCh * (11 * (pspd / 100) ** 2.7 + 11) + nCh * 7.5 * (tf / 100) ** 2.7;
+  const pumpKW = nCh * (7.5 * (pspd / 100) ** 2.7 + 5.5) + nCh * 7.5 * (tf / 100) ** 2.7;
   const chwKW = chKW + pumpKW;
   logic('CHW.KW-TON', load > 1 ? chwKW / load : 0);
   logic('CHW.MU-GPM', load * .03);

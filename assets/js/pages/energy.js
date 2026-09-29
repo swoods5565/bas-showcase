@@ -10,7 +10,7 @@ export default {
   title: () => 'Energy & Utilities',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Dashboards › Energy & utilities' }), h('h1', {}, 'Energy & utility dashboard'),
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Dashboards › Energy & utilities' }), h('h1', {}, 'Energy & utility dashboard'),
         h('p', {}, 'Live metering from the building’s electric, gas and water meters, with 12 months of history modeled from real ERA5 daily temperatures for the site, weather-normalized with change-point regression and benchmarked against ENERGY STAR national medians.')),
       h('div.head-actions', {}, h('span.badge', { id: 'ddSrc' }))));
 

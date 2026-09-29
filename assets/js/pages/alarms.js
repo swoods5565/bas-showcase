@@ -9,7 +9,7 @@ export default {
   title: () => 'Alarms & Events',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Dashboards › Alarms' }), h('h1', {}, 'Alarms & events'),
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Dashboards › Alarms' }), h('h1', {}, 'Alarms & events'),
         h('p', {}, 'Intrinsic-reporting style alarms with BACnet notification classes, time delays, return-to-normal and acknowledgement. NOAA/NWS weather alerts for the site are merged in as external notifications. Try commanding a point to force an alarm — e.g. set AHU-1.SF-SS to Off.')),
       h('div.head-actions', {}, h('button.btn', { onclick: () => { [...sim.alarms.values()].filter(a => !a.acked).forEach(a => ackAlarm(a.id)); toast('All alarms acknowledged'); upd(); } }, 'Acknowledge all'))));
     const kp = h('div.grid', { style: { gridTemplateColumns: 'repeat(5, minmax(0,1fr))' } }); view.append(kp);

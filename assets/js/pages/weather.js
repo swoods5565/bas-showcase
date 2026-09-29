@@ -12,7 +12,7 @@ export default {
   title: () => 'Outdoor Conditions',
   mount(view) {
     const head = h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Dashboards › Outdoor conditions' }), h('h1', {}, 'Outdoor conditions'),
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Dashboards › Outdoor conditions' }), h('h1', {}, 'Outdoor conditions'),
         h('p', {}, 'Live public data for the site: Open-Meteo weather and air quality, NOAA/NWS alerts, and ERA5 degree-days. Psychrometric properties are computed with the ASHRAE Hyland–Wexler formulation at site barometric pressure. Change the site to drive the whole simulation from another city’s weather.')));
     const locBox = h('div.head-actions');
     const inp = h('input.field', { placeholder: 'Search a city…', style: { minWidth: '220px' }, 'aria-label': 'Search city' });

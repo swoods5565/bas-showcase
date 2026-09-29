@@ -1,6 +1,7 @@
 import { h, fmt, clamp, $ } from '../util.js';
 import { pvBox } from '../app.js';
 import { pv, pts } from '../sim.js';
+import { ZONES } from '../building.js';
 import { lineChart, gauge } from '../charts.js';
 
 const pipe = (d, color, key, w = 16) => `<path class="pipe" d="${d}" stroke="${color}" style="stroke-width:${w}" opacity=".85"/><path class="pipe-core" data-p="${key}" d="${d}"/>`;
@@ -27,7 +28,7 @@ function graphic() {
   <text x="60" y="850" class="t-sm">Natural gas service</text>
   ${boiler(300, 1)}${boiler(620, 2)}
   ${pump(1020, 300, 'hwp1', 'HWP-1')}${pump(1020, 540, 'hwp2', 'HWP-2')}
-  <g transform="translate(1500 240)"><rect width="340" height="320" rx="14" class="equip"/><text x="170" y="40" text-anchor="middle" class="t-tag">Heating loads</text><text x="170" y="66" text-anchor="middle" class="t-sm">40 VAV reheat coils · AHU-1 preheat</text></g>
+  <g transform="translate(1500 240)"><rect width="340" height="320" rx="14" class="equip"/><text x="170" y="40" text-anchor="middle" class="t-tag">Heating loads</text><text x="170" y="66" text-anchor="middle" class="t-sm">${ZONES.length} VAV reheat coils · AHU-1 preheat</text></g>
   ${pvBox('HW.MBH', 1530, 360, { label: 'PLANT LOAD', w: 280 })}
   ${pvBox('HW.HW-GPM', 1530, 450, { label: 'HW FLOW', w: 280 })}
   ${pvBox('BLDG.OAT', 1530, 90, { label: 'OUTDOOR AIR', w: 150 })}
@@ -47,7 +48,7 @@ export default {
   title: () => 'Heating Hot Water',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Water Side › Heating hot water' }), h('h1', {}, 'Heating hot-water plant'),
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Water Side › Heating hot water' }), h('h1', {}, 'Heating hot-water plant'),
         h('p', {}, 'Two 1,500 MBH condensing boilers, variable-primary pumping. Supply temperature resets from 160 °F at 10 °F OA to 120 °F at 60 °F OA — low return water keeps the boilers condensing (efficiency climbs as return temperature drops below the ~130 °F flue-gas dew point).')),
       h('div.head-actions', {}, h('span.badge', { id: 'hwB' }))));
     const g = h('div.card.flush.gfx-wrap', { html: graphic() }); view.append(g);

@@ -1,6 +1,9 @@
 import { h, fmt, $, $$, rampColor, clamp } from '../util.js';
 import { pv, sim, pts, isOverridden } from '../sim.js';
-import { ZONES } from '../building.js';
+import { ZONES, FLOORS, BUILDING } from '../building.js';
+import { planSVG, recolorPlan } from '../plans.js';
+const tcol = z => rampColor(HEAT.temp.stops, (pv(z.id + '.ZN-T') - HEAT.temp.min) / (HEAT.temp.max - HEAT.temp.min));
+const tlab = z => fmt(pv(z.id + '.ZN-T'), 0) + '°';
 import { HEAT } from '../dollhouse.js';
 
 const COLS = [
@@ -16,8 +19,8 @@ export default {
   title: () => 'VAV Summary',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Air Side › VAV summary' }), h('h1', {}, 'VAV summary'),
-        h('p', {}, 'All 40 terminal units served by AHU-1. Sort any column, filter by level, and click a row to open the unit graphic. The matrix highlights “rogue zones” that drive the supply-air and static-pressure resets.'))));
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Air Side › VAV summary' }), h('h1', {}, 'VAV summary'),
+        h('p', {}, `All ${ZONES.length} terminal units served by AHU-1. Sort any column, filter by level, and click a row to open the unit graphic. The key plans show every zone’s temperature, and the ranking highlights “rogue zones” that drive the supply-air and static-pressure resets.`))));
     const kp = h('div.grid.g-4'); view.append(kp);
     const mk = (l) => { const c = h('div.card', { html: `<div class="kpi"><div class="lbl">${l}</div><div class="val">--</div><div class="foot"></div></div>` }); kp.append(c); return c; };
     const k1 = mk('Zones in comfort band'), k2 = mk('Average space temp'), k3 = mk('Total VAV airflow'), k4 = mk('Reset requests (clg / static)');
@@ -25,7 +28,7 @@ export default {
     const row = h('div.grid.g-main', { style: { marginTop: '16px' } }); view.append(row);
     const tc = h('div.card'); const mat = h('div.card'); row.append(tc, mat);
     let floor = 0, sortK = 'id', dir = 1, q = '';
-    const seg = h('div.seg', {}, ...['All', 'L1', 'L2', 'L3', 'L4'].map((l, i) => h('button' + (i === 0 ? '.on' : ''), { onclick: (e) => { floor = i; $$('button', seg).forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); render(); } }, l)));
+    const seg = h('div.seg', {}, ...['All', ...FLOORS.map(F => 'L' + F.n)].map((l, i) => h('button' + (i === 0 ? '.on' : ''), { onclick: (e) => { floor = i; $$('button', seg).forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); render(); } }, l)));
     const search = h('input.field', { placeholder: 'Filter zones…', style: { maxWidth: '200px' }, oninput: e => { q = e.target.value.toLowerCase(); render(); } });
     tc.append(h('div.card-h', {}, h('h3', {}, 'Terminal units'), h('div.row', {}, search, seg)));
     const wrap = h('div.tbl-wrap', { style: { maxHeight: '640px' } }); tc.append(wrap);
@@ -33,7 +36,7 @@ export default {
     table.innerHTML = `<thead><tr>${COLS.map(([k, l, , num]) => `<th data-k="${k}" class="${num ? 'num' : ''}">${l}</th>`).join('')}</tr></thead><tbody></tbody>`;
     $$('th', table).forEach(th => th.onclick = () => { const k = th.dataset.k; dir = sortK === k ? -dir : 1; sortK = k; render(); });
 
-    mat.innerHTML = `<div class="card-h"><h3>Zone matrix</h3><span class="sub">space temp · level × zone</span></div><div id="mx"></div>
+    mat.innerHTML = `<div class="card-h"><h3>Key plans</h3><span class="sub">space temp · click a zone</span></div><div id="mx">${FLOORS.slice().reverse().map(F => `<div class="sec-t">${F.name}</div>${planSVG(F.n, { color: tcol, label: tlab, opacity: .55 })}`).join('')}</div>
       <div class="dh-scale" style="margin-top:10px;min-width:0"><div class="ramp" style="background:linear-gradient(90deg,${HEAT.temp.stops.join(',')})"></div><div class="ticks"><span>64</span><span>73</span><span>82 °F</span></div></div>
       <div class="card-h" style="margin-top:18px"><h3>Top request generators</h3><span class="sub">G36 “rogue zone” review</span></div><div id="rogue" class="pt-list"></div>`;
 
@@ -66,11 +69,9 @@ export default {
       k1.querySelector('.val').innerHTML = `${inBand}<small>/ ${ZONES.length}</small>`; k1.querySelector('.foot').textContent = 'within ±1 °F of setpoints';
       k2.querySelector('.val').innerHTML = fmt(ZONES.reduce((a, z) => a + pv(z.id + '.ZN-T'), 0) / ZONES.length, 1) + '<small>°F</small>';
       const md = [0, 0, 0, 0, 0]; ZONES.forEach(z => md[pv(z.id + '.MODE')]++); k2.querySelector('.foot').innerHTML = `<span class="badge cool">${md[1]} clg</span><span class="badge">${md[2]} db</span><span class="badge heat">${md[3]} htg</span>`;
-      k3.querySelector('.val').innerHTML = fmt(pv('AHU-1.SA-CFM'), 0) + '<small>cfm</small>'; k3.querySelector('.foot').textContent = `AHU fan at ${fmt(pv('AHU-1.SF-SPD'), 0)} % · ${fmt(pv('AHU-1.SA-CFM') / 60000 * 100, 0)} % of design`;
+      k3.querySelector('.val').innerHTML = fmt(pv('AHU-1.SA-CFM'), 0) + '<small>cfm</small>'; k3.querySelector('.foot').textContent = `AHU fan at ${fmt(pv('AHU-1.SF-SPD'), 0)} % · ${fmt(pv('AHU-1.SA-CFM') / BUILDING.designCfm * 100, 0)} % of design`;
       k4.querySelector('.val').innerHTML = `${fmt(pv('AHU-1.CLG-REQ'), 0)}<small>/</small> ${fmt(pv('AHU-1.SP-REQ'), 0)}`; k4.querySelector('.foot').textContent = `SAT SP ${fmt(pv('AHU-1.SAT-SP'), 1)} °F · static SP ${fmt(pv('AHU-1.DSP-SP'), 2)} in.`;
-      const mx = $('#mx');
-      mx.innerHTML = `<div style="display:grid;grid-template-columns:34px repeat(10,1fr);gap:4px;font-size:11px">` + ['', ...Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(2, '0'))].map(x => `<div class="muted" style="text-align:center">${x}</div>`).join('') +
-        [4, 3, 2, 1].map(f => `<div class="muted" style="align-self:center">L${f}</div>` + ZONES.filter(z => z.floor === f).map(z => { const t = pv(z.id + '.ZN-T'); const a = alarmsOf(z).length; return `<a href="#/vav/${z.id}" title="${z.id} ${z.name}: ${fmt(t, 1)} °F" style="aspect-ratio:1;border-radius:6px;background:${rampColor(HEAT.temp.stops, (t - 64) / 18)};display:grid;place-items:center;color:#2E3440;font:600 10px var(--mono);${a ? 'box-shadow:0 0 0 2px var(--alarm)' : ''}">${fmt(t, 0)}</a>`; }).join('')).join('') + '</div>';
+      recolorPlan($('#mx'), tcol, tlab);
       const rog = ZONES.map(z => ({ z, s: pv(z.id + '.CLG-LOOP') + pv(z.id + '.DMPR') * .5 + (pv(z.id + '.ZN-T') - pv(z.id + '.ZN-CSP')) * 20 })).sort((a, b) => b.s - a.s).slice(0, 5);
       $('#rogue').innerHTML = rog.map(({ z }) => `<a class="row-pt" href="#/vav/${z.id}" style="color:inherit"><span class="n"><b>${z.id}</b> ${z.name}</span><span class="mono">${fmt(pv(z.id + '.CLG-LOOP'), 0)}% loop · ${fmt(pv(z.id + '.DMPR'), 0)}% dmpr</span></a>`).join('');
     }

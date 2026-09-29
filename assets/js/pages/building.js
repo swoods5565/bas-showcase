@@ -1,6 +1,8 @@
 import { h, fmt, $, $$, ICONS } from '../util.js';
 import { dollhouse, heatLegend, HEAT } from '../dollhouse.js';
-import { ZONES, BUILDING } from '../building.js';
+import { ZONES, BUILDING, FLOORS } from '../building.js';
+import { planSVG, recolorPlan } from '../plans.js';
+import { rampColor } from '../util.js';
 import { pv, sim, pts } from '../sim.js';
 import { spark } from '../charts.js';
 
@@ -8,31 +10,32 @@ export default {
   title: () => 'Building 3D',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: `<a href="#/">Meridian Tower</a> › Building` }), h('h1', {}, 'Dollhouse floor plans'),
-        h('p', {}, 'Every floor is a live, heat-mapped plan built from CSS 3D transforms. Drag to orbit, isolate a level, explode the stack, and click any room to open its VAV graphic. The shadow follows the real sun position for the site.')),
+      h('div', {}, h('div.crumbs', { html: `<a href="#/">Meridian Center</a> › Building` }), h('h1', {}, 'Dollhouse floor plans'),
+        h('p', {}, 'The rendered Level 1 and Level 2 plans are stacked as live 3D plates with heat-mapped zones. Drag to orbit, isolate a level, explode the stack, and click any room to open its VAV graphic. The ground shadow follows the real sun position for the site.')),
     ));
     const card = h('div.card.flush'); view.append(card);
     const dhEl = h('div', { style: { height: '680px' } }); card.append(dhEl);
-    const dh = dollhouse(dhEl, { onRoom: id => location.hash = '#/vav/' + id, onEquip: () => location.hash = '#/ahu', explode: 2.2 });
+    const dh = dollhouse(dhEl, { onRoom: id => location.hash = '#/vav/' + id, onEquip: () => location.hash = '#/ahu', explode: 1.6 });
     const hud = h('div.dh-hud'), hudR = h('div.dh-hud-r'); dhEl.append(hud, hudR);
     const seg = (items, cur, fn) => { const s = h('div.seg'); items.forEach(([k, l]) => { const b = h('button', { onclick: () => { $$('button', s).forEach(x => x.classList.remove('on')); b.classList.add('on'); fn(k); } }, l); if (k === cur) b.classList.add('on'); s.append(b); }); return s; };
     let legend = heatLegend('temp');
     hud.append(seg([['temp', 'Temp'], ['dev', 'Δ Setpoint'], ['co2', 'CO₂'], ['flow', 'Airflow'], ['occ', 'Occupancy']], 'temp', k => { dh.set('heat', k); const n = heatLegend(k); legend.replaceWith(n); legend = n; }));
-    hud.append(seg([[null, 'All'], [1, 'L1'], [2, 'L2'], [3, 'L3'], [4, 'L4']], null, f => dh.focus(f)));
-    const range = h('input', { type: 'range', min: 1, max: 4, step: .05, value: 2.2, 'aria-label': 'Explode floors', style: { width: '160px', accentColor: 'var(--accent)' }, oninput: e => dh.set('explode', +e.target.value) });
+    hud.append(seg([[null, 'All'], ...FLOORS.map(F => [F.n, 'L' + F.n])], null, f => dh.focus(f)));
+    const range = h('input', { type: 'range', min: 0, max: 4, step: .05, value: 1.6, 'aria-label': 'Explode floors', style: { width: '160px', accentColor: 'var(--accent)' }, oninput: e => dh.set('explode', +e.target.value) });
     hud.append(h('div.dh-scale', { style: { minWidth: 'auto', flexDirection: 'row', alignItems: 'center', gap: '10px' } }, h('span', {}, 'Explode'), range));
     hud.append(h('div.row', {}, h('button.btn', { onclick: () => dh.reset(), html: 'Reset view' }), h('button.btn', { onclick: (e) => { const on = !dh.get('auto'); dh.set('auto', on); e.currentTarget.classList.toggle('primary', on); }, html: `${ICONS.play} Orbit` })));
     const sunBox = h('div.dh-scale'); hudR.append(legend, sunBox);
     dhEl.append(h('div.dh-hint', {}, 'Drag to orbit · click a room to open its VAV · rooftop AHU opens AHU-1'));
 
     // Floor summary cards
-    const grid = h('div.grid.g-4', { style: { marginTop: '16px' } }); view.append(grid);
-    const cards = [1, 2, 3, 4].map(f => {
+    const grid = h('div.grid.g-2', { style: { marginTop: '16px' } }); view.append(grid);
+    const cards = FLOORS.map(({ n: f }) => {
       const c = h('div.card.reveal', { style: { cursor: 'pointer' }, onclick: () => { dh.focus(f); $$('.dh-hud .seg')[1].querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === f)); card.scrollIntoView({ behavior: 'smooth' }); } });
       c.innerHTML = `<div class="card-h"><h3>Level ${f}</h3><span class="sub" data-k="al"></span></div>
         <div class="row between"><div class="kpi"><div class="lbl">Avg space temp</div><div class="val" data-k="t">--</div></div><div class="kpi" style="text-align:right"><div class="lbl">Avg CO₂</div><div class="val" style="font-size:22px" data-k="c">--</div></div></div>
         <div class="spark" data-k="sp" style="height:34px;margin:8px 0"></div>
-        <div class="row" style="gap:6px" data-k="m"></div>`;
+        <div class="row" style="gap:6px" data-k="m"></div>
+        <div data-k="plan" style="margin-top:12px">${planSVG(f, { color: tcol, label: tlab, opacity: .55 })}</div>`;
       grid.append(c); return c;
     });
     const upd = () => {
@@ -52,6 +55,7 @@ export default {
         const len = Math.min(...zs.map(z => (ptsHist(z.id + '.ZN-T')).length));
         for (let k = Math.max(0, len - 180); k < len; k++) series.push(zs.reduce((a, z) => a + ptsHist(z.id + '.ZN-T')[k][1], 0) / zs.length);
         spark(c.querySelector('[data-k=sp]'), series, 'var(--accent)');
+        recolorPlan(c.querySelector('[data-k=plan]'), tcol, tlab);
       });
     };
     upd();
@@ -59,3 +63,5 @@ export default {
   },
 };
 const ptsHist = (id) => pts.get(id)?.hist || [];
+const tcol = z => rampColor(HEAT.temp.stops, (HEAT.temp.get(z) - HEAT.temp.min) / (HEAT.temp.max - HEAT.temp.min));
+const tlab = z => fmt(HEAT.temp.get(z), 0) + '°';

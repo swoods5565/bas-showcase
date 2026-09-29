@@ -1,6 +1,7 @@
 import { h, fmt, clamp, $ } from '../util.js';
 import { pvBox } from '../app.js';
 import { pv, pts, sim } from '../sim.js';
+import { ZONES } from '../building.js';
 import { wx } from '../weather.js';
 import { lineChart } from '../charts.js';
 import { psychChart } from '../psychchart.js';
@@ -109,7 +110,7 @@ export default {
   title: () => 'AHU-1',
   mount(view) {
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Air Side › AHU-1' }), h('h1', {}, 'AHU-1 · Variable-air-volume air handler'),
+      h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Air Side › AHU-1' }), h('h1', {}, 'AHU-1 · Variable-air-volume air handler'),
         h('p', {}, 'Return-fan VAV unit with airside economizer, MERV 13 filtration, hot-water preheat and chilled-water cooling. Blade angles, fan speed, flow animation and coil piping are all driven by live points — click any value to inspect or command it.')),
       h('div.head-actions', {}, h('span.badge', { id: 'ahuMode' }), h('a.btn', { href: '#/vavs' }, 'Served VAVs →'))));
     const g = h('div.card.flush.gfx-wrap', { html: graphic() }); view.append(g);
@@ -156,7 +157,7 @@ $('#seq', seq).innerHTML = `<div class="pt-list">
       // Banner
       const econ = pv('AHU-1.ECON-EN') === 1, mode = ['', 'Occupied', 'Unoccupied', 'Morning warm-up', 'Morning cool-down'][pv('BLDG.OCC-MODE')];
       const stage = !on ? 'Unit off' : pv('AHU-1.PHV') > 1 ? 'Heating (preheat)' : econ && pv('AHU-1.CCV') < 1 ? 'Economizer only (free cooling)' : econ ? 'Economizer + mechanical cooling' : pv('AHU-1.CCV') > 1 ? 'Mechanical cooling · minimum OA' : 'Ventilation · minimum OA';
-      svg.querySelector('#ahuBanner').textContent = `${mode}  ·  ${stage}  ·  OA fraction ${fmt(oa * 100, 0)} %  ·  ${fmt(pv('AHU-1.SA-CFM'), 0)} cfm to ${40} VAV boxes`;
+      svg.querySelector('#ahuBanner').textContent = `${mode}  ·  ${stage}  ·  OA fraction ${fmt(oa * 100, 0)} %  ·  ${fmt(pv('AHU-1.SA-CFM'), 0)} cfm to ${ZONES.length} VAV boxes`;
       const b = $('#ahuMode'); b.className = 'badge ' + (on ? 'ok' : 'off'); b.innerHTML = `<i></i>${on ? 'Running' : 'Off'} · ${mode}`;
 
       // Sequence card

@@ -24,7 +24,7 @@ const REFS = [
 export default {
   title: () => 'Graphics Standard',
   mount(view) {
-    view.append(h('div.page-head', {}, h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Tower</a> › Reference' }), h('h1', {}, 'Graphics standard'),
+    view.append(h('div.page-head', {}, h('div', {}, h('div.crumbs', { html: '<a href="#/">Meridian Center</a> › Reference' }), h('h1', {}, 'Graphics standard'),
       h('p', {}, 'The conventions every page in this showcase follows — so a graphics team can reproduce them and an operator never has to guess what a color or symbol means.'))));
     const g = h('div.grid.g-2'); view.append(g);
     const card = (t, sub, html, cls = '') => { const c = h('div.card.reveal' + cls, { html: `<div class="card-h"><h3>${t}</h3><span class="sub">${sub}</span></div>${html}` }); g.append(c); return c; };
@@ -47,7 +47,7 @@ export default {
       <div><div class="faint" style="font-size:11px">BODY · 14 px / 400</div><div>Supply air temperature resets between 55 °F and 65 °F.</div></div></div>`);
     card('Canvas & layout', '1920 × 1080 equipment graphic', `<div class="canvas-frame"><div class="h">Header · site, clock, outdoor air, alarms</div><div>Nav · site → system → unit list</div><div>Equipment graphic (SVG viewBox 1920×1080, scales to any display)</div><div class="f">Status banner · mode · stage · summary</div></div>
       <div class="note" style="margin-top:10px">Standard page set: Site/campus (optional) → Building home → AHU → VAV (full template page) → Plants → Energy dashboard → Equipment dashboards. The left nav expands to list units; the same links appear in every package tier.</div>`);
-    card('Point naming', 'Site.Equipment.Point', `<div class="mono" style="font-size:15px;margin-bottom:10px">MT<span class="faint">.</span>AHU-1<span class="faint">.</span>SAT &nbsp;·&nbsp; MT<span class="faint">.</span>VAV-3-02<span class="faint">.</span>ZN-T</div>
+    card('Point naming', 'Site.Equipment.Point', `<div class="mono" style="font-size:15px;margin-bottom:10px">MC<span class="faint">.</span>AHU-1<span class="faint">.</span>SAT &nbsp;·&nbsp; MC<span class="faint">.</span>VAV-2-11<span class="faint">.</span>ZN-T</div>
       <div class="tbl-wrap" style="max-height:300px"><table class="tbl"><thead><tr><th>Abbrev.</th><th>Meaning</th></tr></thead><tbody>${ABBR.map(([a, b]) => `<tr><td class="mono"><b>${a}</b></td><td style="white-space:normal">${b}</td></tr>`).join('')}</tbody></table></div>
       <div class="note" style="margin-top:8px">VAV tags: VAV-<i>floor</i>-<i>zone</i>. Device instances: AHU 1100, plants 1200/1300, meters 1400, VAVs 2000 + floor·100 + zone on MS/TP network 1000 + floor.</div>`);
     card('BACnet objects & priority array', 'ASHRAE 135', `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Type</th><th>Object</th><th>Typical use</th></tr></thead><tbody>${OBJ.map(([a, b, c]) => `<tr><td class="mono"><b>${a}</b></td><td class="mono">${b}</td><td style="white-space:normal">${c}</td></tr>`).join('')}</tbody></table></div>

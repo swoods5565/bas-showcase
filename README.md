@@ -1,6 +1,6 @@
 # Meridian BAS — Building Automation Graphics Showcase
 
-An interactive, zero-build showcase of building automation system (BAS) graphics and utility dashboards for **Meridian Tower**, a fictional four-story, 72,000 ft² office building. It runs as a static site, so it can be hosted on GitHub Pages.
+An interactive, zero-build showcase of building automation system (BAS) graphics and utility dashboards for **Meridian Center**, a fictional two-story office building of about 57,000 ft². The building geometry is traced from rendered Level 1 and Level 2 floor plans. It runs as a static site, so it can be hosted on GitHub Pages.
 
 Every value on every page is a live, BACnet-style point from an in-browser simulation. Outdoor air comes from **real weather for the site**.
 
@@ -8,11 +8,11 @@ Every value on every page is a live, BACnet-style point from an in-browser simul
 
 | Page | Highlights |
 |---|---|
-| **Overview** | Auto-orbiting 3D building, live KPI ticker, 3D-tilt page tiles |
-| **Building 3D (dollhouse)** | CSS-3D stacked floor plans with extruded walls, glazing and rooftop equipment. Heat-map modes: temperature, Δ setpoint, CO₂, airflow, occupancy. Drag to orbit, explode or isolate floors, click a room to open its VAV. The building's shadow follows the real sun. |
+| **Overview** | The exterior rendering with live pinned callouts, mouse parallax and day/night shading from the real sun, plus a live KPI ticker and 3D-tilt page tiles |
+| **Building 3D (dollhouse)** | The rendered Level 1 and Level 2 plans stacked as CSS-3D plates with live zone overlays, plus a ground-level mechanical yard (AHU-1, cooling towers). Heat-map modes: temperature, Δ setpoint, CO₂, airflow, occupancy. Drag to orbit, explode or isolate floors, click a room to open its VAV. A silhouette shadow follows the real sun. |
 | **AHU-1** | 1920×1080 SVG graphic: damper blades rotate with position, fan speed drives rotor speed, airflow animation, coil piping. Guideline 36 sequence status, AFDD rules, and a live psychrometric process chart (OA → MA → SA). |
-| **VAV summary** | Sortable table of all 40 boxes, a level × zone temperature matrix, and "rogue zone" request ranking |
-| **VAV (×40)** | Terminal-unit graphic, a live G36 dual-maximum control diagram with the operating point, 62.1 ventilation math, key plan, trends, and a fault you can clear by dispatching a tech |
+| **VAV summary** | Sortable table of all 35 boxes, live key plans for both levels, and "rogue zone" request ranking |
+| **VAV (×35)** | Terminal-unit graphic, a live G36 dual-maximum control diagram with the operating point, 62.1 ventilation math, key plan, trends, and a fault you can clear by dispatching a tech |
 | **Chilled-water plant** | Variable-primary plant, 2 chillers, 2 towers, and the pumps. Gauges for kW/ton, ΔT, approach and load. |
 | **Heating hot water** | Condensing boilers with animated flames, the OA reset curve, and the condensing-efficiency curve |
 | **Energy & utilities** | Live demand, today's kWh/therms/gallons/CO₂, an end-use stacked profile, 12 months of history, change-point weather normalization, and EUI vs. the ENERGY STAR median |
@@ -76,7 +76,8 @@ python3 -m http.server 8080
 ```
 
 ## Customize
-- **Building, zones and loads:** `assets/js/building.js`
+- **Building, zones and loads:** `assets/js/building.js` (zone rectangles are traced in each floor image's pixel coordinates)
+- **Floor plan and exterior renders:** `assets/img/floor-1.webp`, `floor-2.webp`, `exterior.webp`
 - **Points, sequences and physics:** `assets/js/sim.js` (every point is defined with `def()`)
 - **Theme (Nord dark/light, ISA-101):** the CSS variables at the top of `assets/css/main.css`
 - **Default site:** `DEFAULT_LOC` in `assets/js/weather.js`
@@ -92,11 +93,12 @@ assets/js/app.js           boot sequence, router + View Transitions, point bindi
 assets/js/sim.js           BACnet-style point database + simulation + alarm engine
 assets/js/weather.js       public API client, solar position, climate-zone estimate
 assets/js/psychro.js       psychrometrics (IP units)
-assets/js/dollhouse.js     CSS-3D dollhouse building
+assets/js/dollhouse.js     CSS-3D dollhouse (rendered floor plates + live overlays)
+assets/js/plans.js         2-D key plans with live zone overlays
 assets/js/charts.js        SVG charts (line/area/stacked, bars, scatter, sparkline, gauge)
 assets/js/psychchart.js    interactive psychrometric chart
 assets/js/energymodel.js   hourly/daily energy model, benchmarks, change-point regression
 assets/js/pages/*.js       one module per page
 ```
 
-Meridian Tower and its equipment are fictional. The sequences and figures are for demonstration and are not design values.
+Meridian Center, its equipment and its data are fictional. The sequences and figures are for demonstration and are not design values.

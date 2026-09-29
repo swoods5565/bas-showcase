@@ -1,7 +1,8 @@
 import { h, fmt, clamp, $, s, ICONS, rampColor } from '../util.js';
 import { pvBox, toast } from '../app.js';
 import { pv, pts, sim, clearFault } from '../sim.js';
-import { ZONES, zoneById, SPACE, BUILDING } from '../building.js';
+import { ZONES, zoneById, SPACE } from '../building.js';
+import { planSVG, recolorPlan } from '../plans.js';
 import { lineChart } from '../charts.js';
 import { HEAT } from '../dollhouse.js';
 
@@ -103,14 +104,8 @@ function dualMax(el, z) {
   return (clg, htg, cfm) => { const x = clg > 0 ? clg : htg > 0 ? -htg : 0; const c = el.querySelector('[data-op]'); c.setAttribute('cx', X(x)); c.setAttribute('cy', Y(cfm)); };
 }
 
-function miniPlan(z) {
-  const k = 3.2, zs = ZONES.filter(q => q.floor === z.floor);
-  return `<svg viewBox="-4 -4 ${BUILDING.plate.w * k + 8} ${BUILDING.plate.d * k + 8}" width="100%" role="img" aria-label="Level ${z.floor} key plan">
-    <rect x="0" y="0" width="${BUILDING.plate.w * k}" height="${BUILDING.plate.d * k}" rx="6" fill="var(--bg-2)" stroke="var(--line-2)" stroke-width="2"/>
-    <rect x="${75 * k}" y="${20 * k}" width="${30 * k}" height="${60 * k}" fill="var(--line)" />
-    ${zs.map(q => { const [x, y, w, d] = q.rect; return `<a href="#/vav/${q.id}"><rect data-mz="${q.id}" x="${x * k + 2}" y="${y * k + 2}" width="${w * k - 4}" height="${d * k - 4}" rx="4" fill="var(--panel-2)" stroke="${q.id === z.id ? 'var(--text)' : 'transparent'}" stroke-width="3"><title>${q.id} ${q.name}</title></rect><text x="${(x + w / 2) * k}" y="${(y + d / 2) * k + 4}" text-anchor="middle" style="font:600 11px var(--mono);fill:#2E3440;pointer-events:none">${q.n}</text></a>`; }).join('')}
-  </svg>`;
-}
+function miniPlan(z) { return planSVG(z.floor, { selected: z.id, color: tcol, opacity: .55 }); }
+const tcol = q => rampColor(HEAT.temp.stops, (HEAT.temp.get(q) - HEAT.temp.min) / (HEAT.temp.max - HEAT.temp.min));
 
 export default {
   title: (id) => id || 'VAV',
@@ -118,7 +113,7 @@ export default {
     const z = zoneById[id] || ZONES[12];
     const idx = ZONES.indexOf(z), prev = ZONES[(idx + ZONES.length - 1) % ZONES.length], next = ZONES[(idx + 1) % ZONES.length];
     view.append(h('div.page-head', {},
-      h('div', {}, h('div.crumbs', { html: `<a href="#/">Meridian Tower</a> › Air Side › <a href="#/vavs">VAV boxes</a> › Level ${z.floor}` }), h('h1', {}, `${z.id} · ${z.name}`),
+      h('div', {}, h('div.crumbs', { html: `<a href="#/">Meridian Center</a> › Air Side › <a href="#/vavs">VAV boxes</a> › Level ${z.floor}` }), h('h1', {}, `${z.id} · ${z.name}`),
         h('p', {}, `Single-duct VAV terminal with hot-water reheat, controlled per ASHRAE Guideline 36 “dual maximum” logic. ${z.face ? 'Perimeter' : 'Interior'} zone, ${fmt(z.area, 0)} ft².`)),
       h('div.head-actions', {}, h('a.btn', { href: '#/vav/' + prev.id }, '← ' + prev.id), h('a.btn', { href: '#/vav/' + next.id }, next.id + ' →'))));
     if (sim.faults[z.id]) {
@@ -156,7 +151,7 @@ export default {
     const upd = () => {
       const on = pv('AHU-1.SF-STS') === 1, cfm = pv(z.id + '.CFM'), dmp = pv(z.id + '.DMPR'), hwv = pv(z.id + '.HWV'), t = pv(z.id + '.ZN-T');
       const csp = pv(z.id + '.ZN-CSP'), hsp = pv(z.id + '.ZN-HSP'), md = pv(z.id + '.MODE'), dat = pv(z.id + '.DAT');
-      svg.querySelector('[data-blade]').style.transform = `rotate(${sim.faults[z.id] ? 38 : dmp / 100 * 85}deg)`;
+      svg.querySelector('[data-blade]').style.transform = `rotate(${sim.faults[z.id] ? 13 : dmp / 100 * 85}deg)`;
       svg.querySelector('[data-blade]').style.fill = sim.faults[z.id] ? 'var(--alarm)' : '';
       const dur = clamp(2200 / Math.max(cfm, 60) * (z.cfmMax / 1500), .35, 5) + 's';
       svg.querySelectorAll('.flow').forEach(f => { f.style.setProperty('--dur', dur); f.classList.toggle('stopped', !on || cfm < 20); });
@@ -173,7 +168,7 @@ export default {
       const sun = svg.querySelector('[data-sun]'); if (sun) { const az = { N: 0, E: 90, S: 180, W: 270 }[z.face]; const inc = sim.sun ? Math.cos((sim.sun.az - az) * Math.PI / 180) * (sim.sun.alt > 0 ? 1 : 0) : 0; sun.setAttribute('opacity', clamp(inc, 0, 1)); }
       const stateTxt = !on ? 'AHU off — box idle' : md === 1 ? `Cooling · airflow modulating ${fmt(pv(z.id + '.CFM-MIN'), 0)}→${fmt(pv(z.id + '.CFM-MAX'), 0)} cfm` : md === 3 ? (pv(z.id + '.HTG-LOOP') > 50 ? 'Heating stage 2 · DAT at max, airflow rising to heating max' : 'Heating stage 1 · minimum airflow, reheat modulating DAT') : 'Deadband · minimum airflow, no reheat';
       svg.querySelector('[data-banner]').textContent = `${stateTxt}  ·  DAT ${fmt(dat, 1)} °F  ·  ${fmt(sim.zones[z.id].people, 0)} occupants (est.)`;
-      document.querySelectorAll('[data-mz]').forEach(r => { const q = ZONES.find(x => x.id === r.dataset.mz); r.setAttribute('fill', rampColor(HEAT.temp.stops, (HEAT.temp.get(q) - HEAT.temp.min) / (HEAT.temp.max - HEAT.temp.min))); });
+      recolorPlan(info, tcol);
       const dcv = sim.zones[z.id].dcv || 0; const de = $('#dcv'); if (de) de.textContent = dcv > 0 ? `Active · min raised ${fmt(dcv * 100, 0)} %` : 'Idle (CO₂ < 700 ppm)';
       setOp(pv(z.id + '.CLG-LOOP'), pv(z.id + '.HTG-LOOP'), pv(z.id + '.CFM-SP'));
       if (n++ % 3 === 0) {

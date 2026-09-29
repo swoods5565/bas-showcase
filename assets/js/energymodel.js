@@ -1,8 +1,10 @@
-// Analytic hourly energy model for Meridian Tower, calibrated to the live simulation's end uses.
+// Analytic hourly energy model for Meridian Center, calibrated to the live simulation's end uses.
 // Used for 24 h profiles and for the 12-month history driven by real (ERA5) daily temperatures.
 import { mulberry32, clamp } from './util.js';
+import { BUILDING } from './building.js';
 
-export const AREA = 72000; // ft² gross
+export const AREA = BUILDING.grossArea; // ft² gross
+const K = AREA / 72000; // model was calibrated on a 72,000 ft² reference building
 export const FACTORS = {
   elecSite2Source: 2.70, gasSite2Source: 1.05,        // ENERGY STAR Portfolio Manager (Aug 2023)
   medianOfficeSiteEUI: 52.9, medianOfficeSourceEUI: 116.4, // ENERGY STAR US national median, Office
@@ -30,7 +32,7 @@ export function hourKW(h, oat, ghi, weekday) {
   const heatMBH = Math.max(0, (55 - oat) * (on ? 17 : 9)) + (on ? 25 : 8);
   const therms = heatMBH * 1000 / .92 / 1e5 + (on ? .3 : .08);
   const other = 7 + (on ? 9 * .6 + 4 : 2.4);
-  return { ltg, plug, fans, chw, other, kw: ltg + plug + fans + chw + other, therms, tons: coolLoadTons };
+  return { ltg: ltg * K, plug: plug * K, fans: fans * K, chw: chw * K, other: other * K, kw: (ltg + plug + fans + chw + other) * K, therms: therms * K, tons: coolLoadTons * K };
 }
 /** daily totals from a daily-mean temperature (diurnal swing ±9 °F) */
 export function dayTotals(date, tmean, rnd = Math.random) {
