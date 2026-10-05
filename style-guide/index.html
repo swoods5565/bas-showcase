@@ -43,6 +43,8 @@
   <a href="#naming">Naming</a>
   <a href="#setup">enteliVIZ setup</a>
   <a href="#open">Open items</a>
+  <div class="side-head">Tools</div>
+  <a href="configurator.html">Project configurator ›</a>
 </nav>
 
 <main id="main">
@@ -334,12 +336,15 @@ AIR,RTU_Summary,RTU Summary,summary,RTU_Summary</pre>
     <li>Unit names match the mechanical schedule: <code>RTU-120</code>, <code>HP-104</code>. Add the area served after it in the menu.</li>
     <li><span class="pill pill-proposed">Proposed</span> Page files: floor plans end in <code>_FP</code>, summaries end in <code>_Summary</code>.</li>
   </ul>
+  <h3 id="tags">Master tag list <span class="pill pill-decided">Decided</span></h3>
+  <p>The tag prefix in a device name decides its equipment type and where it goes in the nav. The configurator uses this same list.</p>
+  <div class="tbl-wrap"><table class="tbl" id="tagTable"></table></div>
 </section>
 
 <!-- ============ SETUP ============ -->
 <section id="setup">
   <h2>enteliVIZ setup checklist</h2>
-  <p class="lead">What to change in a project so it matches this guide. The Brown County project is the reference.</p>
+  <p class="lead">What to change in a project so it matches this guide. The <a href="configurator.html">project configurator</a> builds the CSV and theme files from an enteliWEB device list.</p>
   <ol class="checklist">
     <li><b>Theme.</b> Add <code>Nord_Dark</code> and <code>Nord_Light</code> to <code>assets/CSV/CSS.json</code>, set <code>selectedTheme</code> to <code>Nord_Dark</code> in <code>project.df5</code>. <button class="btn" data-copy-theme>Copy theme JSON</button></li>
     <li><b>Navigation.</b> Rebuild the building's project CSV with the sections and headings above.</li>

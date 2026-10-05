@@ -1,0 +1,11 @@
+"Object Reference",Alarm,Manual,Commissioned,Site,"Device Name",Device,Name,Value,Status,Commissioned
+//DEMO/210100.DEV210100,,,1,DEMO,"Classroom Wing AHU-1",210100,"Classroom Wing AHU-1",Operational,,1
+//DEMO/210101.DEV210101,,,1,DEMO,"AT-1-1 Corridor C100, Corridor C101",210101,"AT-1-1 Corridor C100, Corridor C101",Operational,,
+//DEMO/210102.DEV210102,,,1,DEMO,"AT-1-2 Classroom 102",210102,"AT-1-2 Classroom 102",Operational,,
+//DEMO/210103.DEV210103,,,1,DEMO,"AT-1-3 Science Lab 103, Prep Room 103A",210103,"AT-1-3 Science Lab 103, Prep Room 103A",Operational,,
+//DEMO/210104.DEV210104,,,1,DEMO,"AT-1-4 Science Lab 103",210104,"AT-1-4 Science Lab 103",Operational,,
+//DEMO/210105.DEV210105,,,1,DEMO,"AT-1-5 Teacher'S Lounge 105, Women'S Rr 106 //check sensor",210105,"AT-1-5 Teacher'S Lounge 105, Women'S Rr 106 //check sensor",Operational,,
+//DEMO/210106.DEV210106,,,1,DEMO,"AT-1-6 Library 110",210106,"AT-1-6 Library 110",Operational,,
+//DEMO/210107.DEV210107,,,1,DEMO,"AT-1-7 Library 110, Office 110A",210107,"AT-1-7 Library 110, Office 110A",Operational,,
+//DEMO/210200.DEV210200,,,1,DEMO,"Gym RTU-2",210200,"Gym RTU-2",Operational,,
+//DEMO/210201.DEV210201,,,1,DEMO,"HP-201 Locker Room 201",210201,"HP-201 Locker Room 201",Operational,,

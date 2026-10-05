@@ -1,4 +1,5 @@
 import { THEMES, DELTA, GROUPS } from './themes.js';
+import { TAG_LIST, TYPES, SECTIONS } from './tags.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const NS = 'http://www.w3.org/2000/svg';
@@ -212,6 +213,10 @@ $('#overlayCode').textContent = JSON.stringify({
   alias: 'RMT_RMTSP', valueObject: 'RM_T', setpointObject: 'RM_T_SP', mode: 'valueCompare', unit: '°F', opacity: 10, mouseOver: 50,
   values: [{ value: -3, color: ZONE.cold }, { value: -2, color: ZONE.ok }, { value: 2, color: ZONE.ok }, { value: 3, color: ZONE.warm }],
 }, null, 2);
+
+/* ---------------- master tag list ---------------- */
+$('#tagTable').innerHTML = '<thead><tr><th>Tag prefix</th><th>What it is</th><th>Type</th><th>Nav section</th><th>Flyout heading</th></tr></thead><tbody>' +
+  TAG_LIST.map(([p, t, what]) => `<tr><td><code>${p}-</code></td><td>${what}</td><td>${t}</td><td>${SECTIONS.find((x) => x[0] === TYPES[t].section)[1]}</td><td>${TYPES[t].heading}</td></tr>`).join('') + '</tbody>';
 
 /* ---------------- side nav: active section + mobile ---------------- */
 const links = [...document.querySelectorAll('.side a')];

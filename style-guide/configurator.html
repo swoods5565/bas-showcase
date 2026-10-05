@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ENTEC Project Configurator</title>
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="configurator.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="icon-btn menu-toggle" aria-label="Open contents" data-menu>&#9776;</button>
+  <img src="img/entec-logo.png" alt="ENTEC" class="logo">
+  <div class="topbar-title"><span class="muted">Graphics Standard</span><span class="sep">|</span><b>Project Configurator</b></div>
+  <div class="spacer"></div>
+  <div class="seg" role="group" aria-label="Theme">
+    <button data-set-theme="dark" aria-pressed="true">Nord Dark</button>
+    <button data-set-theme="light" aria-pressed="false">Nord Light</button>
+  </div>
+</header>
+
+<nav class="side" id="side">
+  <div class="side-head">Style guide</div>
+  <a href="index.html">‹ Back to the guide</a>
+  <div class="side-head">Configurator</div>
+  <a href="#building">1. Building</a>
+  <a href="#equipment">2. Equipment</a>
+  <a href="#rooms">3. Rooms</a>
+  <a href="#objects">4. Object map</a>
+  <a href="#areas">5. Floor plan areas</a>
+  <a href="#files">6. Download files</a>
+</nav>
+
+<main id="main">
+
+<section class="hero" id="top">
+  <p class="eyebrow">enteliVIZ · EWM 3dee framework</p>
+  <h1>Project Configurator</h1>
+  <p class="lead">Upload the device list exported from enteliWEB and get the enteliVIZ CSV and theme files, built to the ENTEC standard. Everything runs in your browser; nothing is uploaded anywhere.</p>
+</section>
+
+<!-- 1 -->
+<section id="building">
+  <h2>1. Building</h2>
+  <div class="form-grid">
+    <label>Building name<input id="f-bldg" placeholder="Performing Arts Center"></label>
+    <label>Project CSV name <span class="hint">no spaces, unique per building</span><input id="f-proj" placeholder="PerformingArts"></label>
+    <label>Site <span class="hint">filled from the export</span><input id="f-site" placeholder="SITE"></label>
+    <label>Default level<input id="f-level" value="1"></label>
+    <label>Outdoor air device instance<input id="f-oadev" placeholder="360400"></label>
+    <label>Outdoor air temp object<input id="f-oat" placeholder="AI1301"></label>
+    <label>Outdoor air humidity object<input id="f-oah" placeholder="AI1302"></label>
+    <label>Package
+      <select id="f-pkg"><option value="good">Good (Basic)</option><option value="better" disabled>Better (not defined yet)</option><option value="best" disabled>Best (not defined yet)</option></select></label>
+    <label>Theme
+      <select id="f-theme"><option>Nord_Dark</option><option>Nord_Light</option></select></label>
+  </div>
+  <label class="check"><input type="checkbox" id="f-extra"> Add Dashboards, Alarms, Trends, Schedules, Reports and Legend rows to the nav <span class="hint">only if those pages exist in the project</span></label>
+</section>
+
+<!-- 2 -->
+<section id="equipment">
+  <h2>2. Equipment</h2>
+  <p class="lead">In enteliWEB, export the device list as CSV and drop it here. Device names follow <code>TAG Room Name 101, Room Name 102</code>; anything after <code>//</code> is ignored.</p>
+  <div class="drop" id="drop">
+    <p><b>Drop the CSV here</b> or <label class="linkish">choose a file<input type="file" id="file" accept=".csv,text/csv" hidden></label></p>
+    <p class="small muted">Or <button class="btn" id="paste-btn" type="button">paste it</button> <button class="btn" id="sample-btn" type="button">try the sample</button></p>
+    <textarea id="paste" class="paste" hidden placeholder="Paste the CSV text here, then click Use pasted text"></textarea>
+    <button class="btn" id="paste-use" type="button" hidden>Use pasted text</button>
+  </div>
+  <div id="eq-summary" class="summary-line"></div>
+  <div class="tbl-wrap" id="eq-wrap" hidden><table class="tbl tbl-edit" id="eq-table"></table></div>
+  <details class="details">
+    <summary>Master tag list <span class="hint">how a tag prefix maps to an equipment type and nav section</span></summary>
+    <div class="tbl-wrap"><table class="tbl" id="prefix-table"></table></div>
+  </details>
+</section>
+
+<!-- 3 -->
+<section id="rooms">
+  <h2>3. Rooms</h2>
+  <p class="lead">One row per room per unit. A room served by two units gets two rows, and both units light up when you hover it.</p>
+  <div id="rm-summary" class="summary-line"></div>
+  <div class="tbl-wrap" id="rm-wrap" hidden><table class="tbl" id="rm-table"></table></div>
+</section>
+
+<!-- 4 -->
+<section id="objects">
+  <h2>4. Object map <span class="pill pill-open">Fill in once</span></h2>
+  <p class="lead">Which object in each controller holds each value. Every unit of a type runs the same program, so this is set once per type and remembered in this browser. One <code>COLUMN=OBJECT</code> per line.</p>
+  <div class="obj-grid" id="obj-grid"></div>
+</section>
+
+<!-- 5 -->
+<section id="areas">
+  <h2>5. Floor plan areas</h2>
+  <p class="lead">One area per line. Each becomes a page under Floor Plans with the color overlay turned on.</p>
+  <textarea id="f-areas" class="paste" rows="5" placeholder="Overall Building&#10;First Floor&#10;Second Floor"></textarea>
+</section>
+
+<!-- 6 -->
+<section id="files">
+  <h2>6. Download files</h2>
+  <div id="warnings"></div>
+  <p><button class="btn btn-big" id="zip-btn" type="button">Download all (.zip)</button></p>
+  <div id="file-list"></div>
+  <h3>After importing</h3>
+  <ol class="checklist">
+    <li>Copy the files into the project at the paths shown. Merge the <code>Buildings.csv</code> row into the project's existing file if it has other buildings.</li>
+    <li>In <code>project.df5</code>, set <code>selectedTheme</code> to the theme picked above.</li>
+    <li>In <code>Main.dg5</code>, set <code>alarmCounter</code> to <code>true</code>.</li>
+    <li>Draw the floor plan, equipment and summary pages in the designer, using the page names in the project CSV.</li>
+  </ol>
+</section>
+
+<footer class="foot">ENTEC Graphics Standard · Project Configurator · Draft</footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="configurator.js"></script>
+</body>
+</html>

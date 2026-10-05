@@ -10,3 +10,11 @@ A visual style guide for ENTEC enteliWEB / enteliVIZ graphics. Static files, no 
 - Lato loads from Google Fonts when online and falls back to the server's Lato or Arial when not.
 
 Theme colors live in `themes.js` and `style.css` under the same names as the enteliVIZ `CSS.json` theme keys.
+
+## Project configurator
+
+`configurator.html` turns an enteliWEB device list export (CSV) into the enteliVIZ project CSV (nav), Room Control CSV, Buildings.csv row, CSS.json and floorplanOverlays.json, downloaded as one zip. It runs entirely in the browser.
+
+- Tag prefixes come from the master tag list in `tags.js` (also shown in the guide under Naming). Add new prefixes there.
+- Object maps (which object holds RM_T, RM_T_SP, ... per equipment type) are entered once per browser and kept in local storage.
+- `sample-objectlist.csv` is a fictional export for trying it out.
