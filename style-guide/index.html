@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ENTEC Graphics Standard</title>
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="icon-btn menu-toggle" aria-label="Open contents" data-menu>&#9776;</button>
+  <img src="img/entec-logo.png" alt="ENTEC" class="logo">
+  <div class="topbar-title"><span class="muted">Graphics Standard</span><span class="sep">|</span><b>Basic tier</b></div>
+  <div class="spacer"></div>
+  <span class="badge-version">Draft 0.2 · Oct 2026</span>
+  <div class="seg" role="group" aria-label="Theme">
+    <button data-set-theme="dark" aria-pressed="true">Nord Dark</button>
+    <button data-set-theme="light" aria-pressed="false">Nord Light</button>
+  </div>
+</header>
+
+<nav class="side" id="side">
+  <div class="side-head">Getting started</div>
+  <a href="#start">How to use this guide</a>
+  <a href="#tiers">Packages</a>
+  <div class="side-head">Page frame</div>
+  <a href="#canvas">Canvas and grid</a>
+  <a href="#header">Header bar</a>
+  <a href="#nav">Navigation</a>
+  <div class="side-head">Look</div>
+  <a href="#type">Typography</a>
+  <a href="#color">Colors</a>
+  <div class="side-head">Page types</div>
+  <a href="#floorplans">Floor plans</a>
+  <a href="#equipment">Equipment pages</a>
+  <a href="#summaries">Summary tables</a>
+  <a href="#dashboard">Building Summary</a>
+  <div class="side-head">Build</div>
+  <a href="#naming">Naming</a>
+  <a href="#setup">enteliVIZ setup</a>
+  <a href="#open">Open items</a>
+</nav>
+
+<main id="main">
+
+<!-- ============ START ============ -->
+<section id="start" class="hero">
+  <p class="eyebrow">ENTEC · Delta Controls enteliWEB / enteliVIZ</p>
+  <h1>Graphics Standard</h1>
+  <p class="lead">How every ENTEC graphic looks and works, so a building built by any tech feels like the same product. Each section shows a working example first, then the rules.</p>
+  <div class="legend-pills">
+    <span class="pill pill-decided">Decided</span> agreed and ready to build
+    <span class="pill pill-proposed">Proposed</span> first suggestion, review it
+    <span class="pill pill-open">Open</span> still to decide
+  </div>
+  <div class="cards three">
+    <div class="card"><h3>Built in enteliVIZ</h3><p>Pages use Delta's EWM "3dee" framework. Theme, nav and floor plan colors are settings files, not drawing.</p></div>
+    <div class="card"><h3>Dark and light</h3><p>Use the switch at the top. Every example on this page redraws in the theme you pick.</p></div>
+    <div class="card"><h3>Delta colors stay</h3><p>Alarm, override, normal, chart and piping colors are Delta standard in every theme.</p></div>
+  </div>
+</section>
+
+<section id="tiers">
+  <h2>Packages <span class="pill pill-decided">Decided</span></h2>
+  <p class="lead">Packages differ by depth and features, never by which equipment gets graphics. Everything in the building gets a graphic in every package.</p>
+  <div class="tiers">
+    <div class="tier tier-on"><div class="tier-name">Good</div><div class="tier-sub">Basic</div>
+      <ul><li>Floor plans with zone tags, hover highlight, legend and key plan</li><li>Every piece of equipment</li><li>Summary table per equipment type</li><li>Building Summary overview</li><li>Alarms, trends, schedules</li><li>Reports: Overrides, Alarm History, Points in Fault/Offline, Runtime Hours</li><li>Legend page</li></ul></div>
+    <div class="tier"><div class="tier-name">Better</div><div class="tier-sub">More complex</div><p class="muted">Everything in Good, plus deeper features. <span class="pill pill-open">Open</span></p></div>
+    <div class="tier"><div class="tier-name">Best</div><div class="tier-sub">Fully custom</div><p class="muted">Everything in Better, plus custom dashboards. <span class="pill pill-open">Open</span></p></div>
+  </div>
+</section>
+
+<!-- ============ CANVAS ============ -->
+<section id="canvas">
+  <h2>Canvas and grid</h2>
+  <figure class="frame">
+    <svg viewBox="0 0 1920 1080" class="canvas-svg" role="img" aria-label="1920 by 1080 page layout">
+      <defs><pattern id="g40" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" class="grid-line"/></pattern></defs>
+      <rect width="1920" height="1080" class="c-stage"/>
+      <rect width="1920" height="1080" fill="url(#g40)"/>
+      <rect width="1920" height="80" class="c-header"/>
+      <text x="960" y="50" class="c-label" text-anchor="middle">Header bar · 80 px</text>
+      <rect x="40" y="120" width="400" height="920" class="c-zone"/>
+      <text x="240" y="570" class="c-label" text-anchor="middle">Info column</text>
+      <text x="240" y="610" class="c-small" text-anchor="middle">400 px · 10 cells</text>
+      <rect x="480" y="120" width="960" height="920" class="c-zone c-zone-main"/>
+      <text x="960" y="570" class="c-label" text-anchor="middle">Graphic / floor plan</text>
+      <rect x="1480" y="120" width="400" height="920" class="c-zone"/>
+      <text x="1680" y="570" class="c-label" text-anchor="middle">Legend + key plan</text>
+      <text x="1680" y="610" class="c-small" text-anchor="middle">floor plans only</text>
+      <path d="M0 100H40M1880 100H1920" class="c-dim"/><text x="20" y="114" class="c-small" text-anchor="middle">40</text>
+    </svg>
+    <figcaption>Design size 1920 × 1080 on a 40 px grid (48 × 27 cells). The dark background image uses this same grid.</figcaption>
+  </figure>
+  <ul class="rules">
+    <li><span class="pill pill-decided">Decided</span> Design every page at <b>1920 × 1080</b>. enteliVIZ stretches pages to fit the screen, so this is the design size, not a fixed size.</li>
+    <li><span class="pill pill-decided">Decided</span> Snap everything to the <b>40 px grid</b>.</li>
+    <li><span class="pill pill-decided">Decided</span> Dark theme background: the Nord dark grid image (<code>nord-dark-grid-1920x1080.png</code>).</li>
+    <li><span class="pill pill-proposed">Proposed</span> Zones: 80 px header, 40 px outer margin, 400 px side columns.</li>
+    <li>The navigation menu opens over the page from the left. It never takes canvas space.</li>
+  </ul>
+</section>
+
+<!-- ============ HEADER ============ -->
+<section id="header">
+  <h2>Header bar</h2>
+  <p class="lead">Same on every page and every job. Never redrawn per job.</p>
+  <div class="mock-header" id="mockHeader">
+    <span class="mh-item" data-n="1"><span class="mh-icon">&#9776;</span></span>
+    <span class="mh-item" data-n="2"><svg viewBox="0 0 24 24" class="mh-svg"><path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z"/></svg></span>
+    <span class="mh-center" data-n="3"><span class="mh-muted">Brown County High School</span><span class="mh-sep">|</span><b>Gym Area Floor Plan</b></span>
+    <span class="mh-item" data-n="4"><span class="mh-muted">OA</span> 58.2°F <span class="mh-muted">· 64% RH</span></span>
+    <span class="mh-item" data-n="5"><span class="mh-muted" id="clock">--</span></span>
+    <span class="mh-item" data-n="6"><svg viewBox="0 0 24 24" class="mh-svg"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg> jsmith</span>
+    <span class="mh-item mh-alarm" data-n="7"><svg viewBox="0 0 24 24" class="mh-svg"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0"/></svg><span class="count">3</span></span>
+    <span class="mh-item" data-n="8">&#8249;&nbsp;&#8250;</span>
+    <span class="mh-item" data-n="9">&#9636;</span>
+  </div>
+  <ol class="callouts">
+    <li><b>Menu</b> opens the navigation flyout.</li>
+    <li><b>Home</b> returns to the building overview page. Label and tooltip: "Home".</li>
+    <li><b>Building name</b> (muted) <b>|</b> <b>page title</b> (bold).</li>
+    <li><b>Outdoor air</b> temperature and humidity.</li>
+    <li><b>Date and time.</b> <span class="pill pill-decided">Decided</span></li>
+    <li><b>Logged-in user</b> from enteliWEB. <span class="pill pill-decided">Decided</span></li>
+    <li><b>Alarm badge</b> with the active alarm count, opens Alarms. Uses the framework's alarm counter. <span class="pill pill-decided">Decided</span></li>
+    <li><b>Back / forward</b> through pages.</li>
+    <li><b>Side panel</b> toggle (enteliWEB information panel).</li>
+  </ol>
+</section>
+
+<!-- ============ NAV ============ -->
+<section id="nav">
+  <h2>Navigation <span class="pill pill-decided">Decided</span></h2>
+  <p class="lead">A left flyout. Pick a section, then pick a page from its panel. Pages in a panel sit under UPPERCASE headings. Try it:</p>
+  <div class="mock-nav">
+    <ul class="mn-l1" id="navL1"></ul>
+    <div class="mn-l2" id="navL2"></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>Rules</h3>
+      <ul class="rules">
+        <li>Sections, in this order: Floor Plans, Air Systems, Central Plant, Terminal Units, Miscellaneous, Dashboards, Alarms, Trends, Schedules, Reports, Legend.</li>
+        <li>Home is the header button, not a menu item.</li>
+        <li>Name sections by system, never "HVAC", "Ventilation" or "Hydronics".</li>
+        <li>Air Systems and Central Plant end with a <b>SUMMARY</b> heading. In Terminal Units, each unit type's summary table is its page, and single units open from the table.</li>
+        <li>Leave out sections the job doesn't have. enteliVIZ hides a section with no pages anyway.</li>
+        <li>Overrides is a report under Reports, not its own section.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>How it's built</h3>
+      <p>The building's project CSV drives the menu. The first row of a <code>menu</code> code names the section. A row whose name is UPPERCASE and has no page becomes a heading.</p>
+<pre class="code"><span class="c-com">menu,pageAlias,en,folder,pageInclude</span>
+HOME,Main,Home,home,homePage
+AIR,AIR,Air Systems,,
+AIR,AIR,<b>ROOFTOP UNITS</b>,,
+AIR,RTU120,RTU-120 MS Cafeteria,ventilation,RTU120
+AIR,AIR,<b>SUMMARY</b>,,
+AIR,RTU_Summary,RTU Summary,summary,RTU_Summary</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TYPE ============ -->
+<section id="type">
+  <h2>Typography <span class="pill pill-decided">Lato</span></h2>
+  <p class="lead">Lato is built into the enteliVIZ framework (LatoRegular, LatoBlack). Don't substitute other fonts.</p>
+  <div class="type-scale">
+    <div class="ts-row"><div class="ts-meta">Page title<br><span>LatoBlack · 20</span></div><div style="font-size:20px;font-weight:900">Gym Area Floor Plan</div></div>
+    <div class="ts-row"><div class="ts-meta">Panel heading<br><span>LatoBlack · 16</span></div><div style="font-size:16px;font-weight:900">Supply Air</div></div>
+    <div class="ts-row"><div class="ts-meta">Value / label<br><span>LatoRegular · 14</span></div><div style="font-size:14px">Discharge Air Temp <b class="secondary">55.4 °F</b></div></div>
+    <div class="ts-row"><div class="ts-meta">Zone tag<br><span>LatoBlack · 14 / LatoRegular · 14</span></div><div style="font-size:14px"><b>HP-104</b> &nbsp; 72.4 °F</div></div>
+    <div class="ts-row"><div class="ts-meta">Small / units<br><span>LatoRegular · 12</span></div><div style="font-size:12px" class="muted">Last updated 10:42 · °F · %RH</div></div>
+  </div>
+  <ul class="rules">
+    <li><span class="pill pill-proposed">Proposed</span> Only these five sizes. The framework offers 10 to 36; most existing pages use 14 and 12.</li>
+    <li>Labels use the theme's primary (muted) color. Live values use the secondary (bright) color.</li>
+    <li>Always show units. Temperatures as <code>72.4 °F</code>, one decimal.</li>
+  </ul>
+</section>
+
+<!-- ============ COLOR ============ -->
+<section id="color">
+  <h2>Colors</h2>
+  <p class="lead">Theme colors use the exact enteliVIZ theme key names, so a tech can find each one in <code>CSS.json</code>. Click a swatch to copy its hex.</p>
+  <h3>Theme: <span id="themeName">Nord_Dark</span> <span class="pill pill-proposed">Starting palette</span></h3>
+  <div id="themeSwatches"></div>
+  <h3>Status <span class="pill pill-decided">Delta standard</span></h3>
+  <div class="swatches" id="statusSwatches"></div>
+  <h3>Zone temperature <span class="pill pill-decided">Decided</span></h3>
+  <div class="swatches" id="zoneSwatches"></div>
+  <h3>Piping <span class="pill pill-decided">Delta standard</span></h3>
+  <div class="swatches small" id="pipeSwatches"></div>
+  <h3>Charts <span class="pill pill-decided">Delta standard</span></h3>
+  <div class="chart-strip" id="chartStrip"></div>
+</section>
+
+<!-- ============ FLOOR PLANS ============ -->
+<section id="floorplans">
+  <h2>Floor plans</h2>
+  <p class="lead">Hover a zone tag or a room. Every room that unit serves lights up. This hover highlight is required in every package.</p>
+  <div class="fp-wrap">
+    <svg viewBox="0 0 1000 560" class="fp" id="fp" role="img" aria-label="Example floor plan"></svg>
+    <aside class="fp-side">
+      <div class="callout">
+        <div class="callout-h">Legend</div>
+        <div class="callout-b" id="fpLegend"></div>
+      </div>
+      <div class="callout">
+        <div class="callout-h">Building key</div>
+        <div class="callout-b"><svg viewBox="0 0 200 120" class="keyplan" id="keyplan"></svg><p class="small muted">Highlighted: the area on this page.</p></div>
+      </div>
+    </aside>
+  </div>
+  <div class="cols">
+    <div><h3>Zone tag</h3>
+      <div class="tag-demo">
+        <div class="ztag"><b>HP-104</b><span>72.4 °F</span><i style="background:var(--ok)"></i></div>
+        <div class="ztag"><b>HP-110</b><span>67.1 °F</span><i style="background:var(--cold)"></i></div>
+        <div class="ztag"><b>RTU-120</b><span>76.8 °F</span><i style="background:var(--warm)"></i></div>
+        <div class="ztag"><b>HP-118</b><span>71.0 °F</span><i style="background:var(--alarm)"></i></div>
+        <div class="ztag ztag-off"><b>HP-122</b><span>--</span><i></i></div>
+      </div>
+      <ul class="rules">
+        <li><span class="pill pill-decided">Decided</span> Tag shows the <b>unit name and room temperature only</b>. No setpoint.</li>
+        <li>The colored bar under the tag shows comfort: blue cold, green comfortable, orange too warm, red alarm.</li>
+        <li>Room fill uses the same color, faint (10%), and stronger on hover (50%).</li>
+      </ul>
+    </div>
+    <div><h3>Every floor plan has</h3>
+      <ul class="rules">
+        <li><span class="pill pill-decided">Decided</span> A <b>legend</b> of the tag colors.</li>
+        <li><span class="pill pill-decided">Decided</span> A <b>building key plan</b> with the current area highlighted.</li>
+        <li><span class="pill pill-decided">Decided</span> Hover highlight of the rooms each unit serves.</li>
+        <li>Flat 2D plan: walls in one line weight, room names in the muted color. No pseudo-3D.</li>
+        <li>Clicking a tag opens that unit's graphic.</li>
+        <li><span class="pill pill-open">Open</span> Comfort range, offline color, key plan look.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EQUIPMENT ============ -->
+<section id="equipment">
+  <h2>Equipment pages <span class="pill pill-proposed">Proposed</span></h2>
+  <figure class="frame">
+    <svg viewBox="0 0 1920 1000" class="canvas-svg" role="img" aria-label="Equipment page layout">
+      <rect width="1920" height="1000" class="c-stage"/>
+      <rect x="40" y="40" width="400" height="200" class="c-zone"/><text x="60" y="80" class="c-label">Status</text><text x="60" y="120" class="c-small">Mode, occupancy, enable, run</text>
+      <rect x="40" y="280" width="400" height="320" class="c-zone"/><text x="60" y="320" class="c-label">Setpoints</text><text x="60" y="360" class="c-small">Editable values, override shows orange</text>
+      <rect x="40" y="640" width="400" height="320" class="c-zone"/><text x="60" y="680" class="c-label">Alarms</text><text x="60" y="720" class="c-small">Active alarms for this unit</text>
+      <rect x="480" y="40" width="1400" height="920" class="c-zone c-zone-main"/>
+      <g class="eq-sketch" transform="translate(640 380)">
+        <rect x="0" y="0" width="1080" height="220" rx="6"/>
+        <path d="M120 0v220M300 0v220M480 0v220M680 0v220M880 0v220"/>
+        <text x="60" y="260" text-anchor="middle">OA damper</text><text x="210" y="260" text-anchor="middle">Filter</text><text x="390" y="260" text-anchor="middle">Heat</text><text x="580" y="260" text-anchor="middle">Cool</text><text x="780" y="260" text-anchor="middle">Supply fan</text><text x="980" y="260" text-anchor="middle">Discharge</text>
+        <path d="M-120 110H0M1080 110h140" class="arrow"/>
+      </g>
+      <text x="1180" y="100" class="c-label" text-anchor="middle">Equipment graphic · air flows left to right</text>
+    </svg>
+  </figure>
+  <ul class="rules">
+    <li>Info column on the left: Status, Setpoints, Alarms, in that order.</li>
+    <li>Graphic on the right. Air and water flow left to right.</li>
+    <li>Values sit next to the component they belong to, label above value.</li>
+    <li>Pipes use Delta piping colors. Ducts use the neutral accent.</li>
+  </ul>
+</section>
+
+<!-- ============ SUMMARIES ============ -->
+<section id="summaries">
+  <h2>Summary tables <span class="pill pill-decided">Decided</span></h2>
+  <p class="lead">One table per equipment type, living in its own nav section under SUMMARY. Each table is built once.</p>
+  <div class="tbl-wrap"><table class="tbl" id="hpTable"></table></div>
+  <div class="cols">
+    <div><ul class="rules">
+      <li>Unit name links to its graphic. Sort by unit name.</li>
+      <li>Overridden values in Delta orange, alarms in Delta red.</li>
+      <li>Status and alarm columns are words, not just color.</li>
+    </ul></div>
+    <div><h3>Columns <span class="pill pill-proposed">Proposed</span></h3>
+      <dl class="cols-list">
+        <dt>RTU / AHU</dt><dd>Unit, Status, Occupancy, Space Temp, DA Temp, DA SP, Heat/Cool, Econ %, Alarm</dd>
+        <dt>VAV</dt><dd>Unit, Room, Space Temp, Active SP, Airflow, Airflow SP, Damper %, Reheat %</dd>
+        <dt>Heat pump / FCU</dt><dd>Unit, Room, Space Temp, Active SP, Mode, Fan, Comp/Valve, Alarm</dd>
+        <dt>Plant</dt><dd>System, Status, Supply Temp, Supply SP, Return Temp, Lead Pump</dd>
+      </dl></div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="dashboard">
+  <h2>Building Summary <span class="pill pill-decided">Decided</span></h2>
+  <p class="lead">The first page under Dashboards in every package. A status strip, then one short block per section that links to that section's summary.</p>
+  <div class="dash">
+    <div class="strip">
+      <div class="kpi"><span class="kpi-n" style="color:var(--ok)">42</span><span>Running</span></div>
+      <div class="kpi"><span class="kpi-n" style="color:var(--alarm)">3</span><span>In alarm</span></div>
+      <div class="kpi"><span class="kpi-n" style="color:var(--warm)">2</span><span>Overridden</span></div>
+      <div class="kpi"><span class="kpi-n muted">1</span><span>Offline</span></div>
+    </div>
+    <div class="dash-blocks">
+      <div class="callout"><div class="callout-h">Air Systems <a href="#summaries">Summary ›</a></div><div class="callout-b"><b class="secondary">3</b> units · <span class="t-alarm">RTU-124 alarm</span></div></div>
+      <div class="callout"><div class="callout-h">Central Plant <a href="#summaries">Summary ›</a></div><div class="callout-b"><b class="secondary">1</b> system · all normal</div></div>
+      <div class="callout"><div class="callout-h">Terminal Units <a href="#summaries">Summary ›</a></div><div class="callout-b"><b class="secondary">39</b> heat pumps · <span class="t-alarm">HP-118, HP-131 alarm</span> · <span class="t-warm">HP-107 override</span></div></div>
+      <div class="callout"><div class="callout-h">Outdoor Conditions</div><div class="callout-b">58.2 °F · 64% RH</div></div>
+    </div>
+  </div>
+  <p class="small muted">Energy &amp; Utilities appears only when the job has meters and it is required.</p>
+</section>
+
+<!-- ============ NAMING ============ -->
+<section id="naming">
+  <h2>Naming</h2>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Section</th><th>menu code</th><th>Example pageAlias</th><th>Example name in menu</th></tr></thead>
+    <tbody>
+      <tr><td>Floor Plans</td><td><code>FP</code></td><td><code>Gym_FP</code></td><td>Gym Area</td></tr>
+      <tr><td>Air Systems</td><td><code>AIR</code></td><td><code>RTU120</code></td><td>RTU-120 MS Cafeteria</td></tr>
+      <tr><td>Central Plant</td><td><code>PLANT</code></td><td><code>HWS_CHWS</code></td><td>HW/CHW System</td></tr>
+      <tr><td>Terminal Units</td><td><code>TU</code></td><td><code>HP_Summary</code></td><td>Heat Pump Summary</td></tr>
+      <tr><td>Miscellaneous</td><td><code>MISC</code></td><td><code>EF_Summary</code></td><td>Exhaust Fan Summary</td></tr>
+      <tr><td>Dashboards</td><td><code>DASH</code></td><td><code>Bldg_Summary</code></td><td>Building Summary</td></tr>
+    </tbody></table></div>
+  <ul class="rules">
+    <li>Every <code>pageAlias</code> is unique in the building. The home page is always <code>Main</code>, first under <code>HOME</code>.</li>
+    <li>Unit names match the mechanical schedule: <code>RTU-120</code>, <code>HP-104</code>. Add the area served after it in the menu.</li>
+    <li><span class="pill pill-proposed">Proposed</span> Page files: floor plans end in <code>_FP</code>, summaries end in <code>_Summary</code>.</li>
+  </ul>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section id="setup">
+  <h2>enteliVIZ setup checklist</h2>
+  <p class="lead">What to change in a project so it matches this guide. The Brown County project is the reference.</p>
+  <ol class="checklist">
+    <li><b>Theme.</b> Add <code>Nord_Dark</code> and <code>Nord_Light</code> to <code>assets/CSV/CSS.json</code>, set <code>selectedTheme</code> to <code>Nord_Dark</code> in <code>project.df5</code>. <button class="btn" data-copy-theme>Copy theme JSON</button></li>
+    <li><b>Navigation.</b> Rebuild the building's project CSV with the sections and headings above.</li>
+    <li><b>Floor plan colors.</b> In <code>assets/CSV/floorplanOverlays.json</code>, the first overlay compares <code>RM_T</code> to <code>RM_T_SP</code> in °F with the zone colors. Set <code>overlayEnabled</code> to <code>true</code> on floor plan rows.</li>
+    <li><b>Alarm badge.</b> Set <code>alarmCounter</code> to <code>true</code> in <code>Main.dg5</code>.</li>
+    <li><b>Draw in the designer:</b> floor plans, zone tags, legend, key plan, equipment graphics, summary tables.</li>
+  </ol>
+<pre class="code" id="overlayCode"></pre>
+</section>
+
+<!-- ============ OPEN ============ -->
+<section id="open">
+  <h2>Open items</h2>
+  <ul class="rules">
+    <li><span class="pill pill-open">Open</span> Comfort range (how far from setpoint is blue or orange).</li>
+    <li><span class="pill pill-open">Open</span> Offline tag color.</li>
+    <li><span class="pill pill-open">Open</span> Building key plan look and behavior.</li>
+    <li><span class="pill pill-open">Open</span> Light theme background.</li>
+    <li><span class="pill pill-open">Open</span> Outdoor Conditions contents.</li>
+    <li><span class="pill pill-open">Open</span> Icon set.</li>
+    <li><span class="pill pill-open">Open</span> Better and Best package contents.</li>
+  </ul>
+</section>
+
+<footer class="foot">ENTEC Graphics Standard · Draft 0.2 · Owner: Steve Woods</footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
