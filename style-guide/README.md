@@ -13,7 +13,8 @@ Theme colors live in `themes.js` and `style.css` under the same names as the ent
 
 ## Project configurator
 
-`configurator.html` turns an enteliWEB device list export (CSV) into the enteliVIZ project CSV (nav), Room Control CSV, Buildings.csv row, CSS.json and floorplanOverlays.json, downloaded as one zip. It runs entirely in the browser.
+`configurator.html` turns enteliWEB device list exports (CSV, one per building) into the enteliVIZ files for a whole job: Buildings.csv (campus + buildings), Campus.csv, a nav CSV and a Room Control CSV per building, one shared Translation.csv, CSS.json and floorplanOverlays.json, downloaded as one zip. Buildings with lighting control get a LIGHT menu and a LIGHT row per room. It runs entirely in the browser.
+- Column names are checked against Delta's RmCtrlStruct.json (bundled as `rmctrl-struct.js`).
 
 - Tag prefixes come from the master tag list in `tags.js` (also shown in the guide under Naming). Add new prefixes there.
 - Object maps (which object holds RM_T, RM_T_SP, ... per equipment type) are entered once per browser and kept in local storage.

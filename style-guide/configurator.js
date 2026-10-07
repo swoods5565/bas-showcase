@@ -1,5 +1,6 @@
 import { CSS_THEMES } from './delta-themes.js';
 import { TAG_LIST, TYPES, SECTIONS } from './tags.js';
+import { RMCTRL_STRUCT } from './rmctrl-struct.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -58,23 +59,43 @@ $('#prefix-table').addEventListener('click', (e) => {
   } else return;
   store.set('tags', extraTags);
   rebuildPrefixes(); renderPrefixes();
-  devices.forEach((d) => { const t = PREFIXES[d.tag.split('-')[0]]; if (t && d.type === 'OTHER') d.type = t; });
+  project.buildings.forEach((b) => b.devices.forEach((d) => { const t = PREFIXES[d.tag.split('-')[0]]; if (t && d.type === 'OTHER') d.type = t; }));
+  saveProject();
   renderAll();
 });
 
+/* ---------------- room control columns (Delta RmCtrlStruct.json) ---------------- */
+const STRUCT = new Map(RMCTRL_STRUCT.map(([a, en, ro]) => [a, { en, ro }]));
+// RM_ columns must match an alias exactly; others are CATEGORY_NAME, both parts looked up.
+const colKnown = (c) => {
+  if (STRUCT.has(c)) return true;
+  if (c.startsWith('RM_')) return false;
+  const i = c.indexOf('_');
+  return i > 0 && STRUCT.has(c.slice(0, i)) && STRUCT.has(c.slice(i + 1));
+};
+const dl = document.createElement('datalist');
+dl.id = 'rm-cols';
+dl.innerHTML = RMCTRL_STRUCT.map(([a, en]) => `<option value="${esc(a)}">${esc(en)}</option>`).join('');
+document.body.appendChild(dl);
+
 /* ---------------- object map defaults ---------------- */
-// Heat pump map is the one used on Brown County. Others are left for the tech to fill once.
+// Room view symbols that exist in Delta's palette/RoomControlEquipment.dg5.
+const SYMBOLS = ['VAV', 'VAV_RH', 'CAV', 'CAV_RH', 'FPB', 'TA', 'FCU_6W_VLV', 'FCU_CLG', 'FCU_FLT_EF', 'CRAC', 'FH', 'IND', 'LIGHT', 'SimpleLight', 'VAV MECH'];
+const DEFAULT_SYMBOL = { VAV: 'VAV_RH', FPVAV: 'FPB', FCU: 'FCU_6W_VLV', LIGHT: 'LIGHT' };
+// VAV and LIGHT come from Delta's EWM example; the heat pump map is Brown County's. Confirm against ENTEC's programs.
 const DEFAULT_MAPS = {
-  VAV: 'RM_T=\nRM_T_SP=\nSA_AF=\nSA_AF_SP=\nDMP_POS=\nHW_VLV=\nSA_TMP=',
-  FPVAV: 'RM_T=\nRM_T_SP=\nSA_AF=\nSA_AF_SP=\nDMP_POS=\nFAN_STS=\nHW_VLV=\nSA_TMP=',
-  HP: 'RM_MODE=MV101\nRM_T=AI201001\nRM_T_SP=AV10290\nSA_TMP=AI1\nFAN_CMD=BO1\nCOMP_CMD=BO3\nCOMP_REV_VLV_CMD=BO2\nCOMP_ENT_TMP=AI2\nCOMP_LVG_TMP=AI3\nCOMP_CONDENSATE=BI5\nCOMP_FAULT=BI4',
-  FCU: 'RM_T=\nRM_T_SP=\nFAN_CMD=\nHW_VLV=\nCHW_VLV=\nSA_TMP=',
-  UV: 'RM_T=\nRM_T_SP=\nFAN_CMD=\nHW_VLV=\nDMP_POS=',
-  CUH: 'RM_T=\nRM_T_SP=\nFAN_CMD=\nHW_VLV=',
-  EF: 'FAN_CMD=\nFAN_STS=',
+  VAV: '# From Delta\'s EWM example VAV: confirm\nRM_T=AI1\nRM_T_SP=AV6\nSA_T=AI2\nDMP_POS=AV16\nFLOW_AMP=AV18\nFLOW_SP=AV5\nHC=AO3',
+  FPVAV: 'RM_T=\nRM_T_SP=\nSA_T=\nDMP_POS=\nFLOW_AMP=\nFLOW_SP=\nFAN_ST=\nHC=',
+  HP: '# From Brown County heat pumps\nMODE_OPER=MV101\nRM_T=AI201001\nRM_T_SP=AV10290\nSA_T=AI1\nFAN_SS=BO1\nCOMP_CMD=BO3\nCOMP_REV_VLV_CMD=BO2\nCOMP_ENT_TMP=AI2\nCOMP_LVG_TMP=AI3\nCOMP_CONDENSATE=BI5\nCOMP_FAULT=BI4',
+  FCU: 'RM_T=\nRM_T_SP=\nFAN_SS=\nHC=\nCC=\nSA_T=',
+  UV: 'RM_T=\nRM_T_SP=\nFAN_SS=\nHC=\nDMP_POS=',
+  CUH: 'RM_T=\nRM_T_SP=\nFAN_SS=\nHC=',
+  EF: 'FAN_SS=\nFAN_ST=',
   OTHER: 'RM_T=\nRM_T_SP=',
+  LIGHT: '# From Delta\'s EWM example lighting: confirm\nLIGHT_CMD=BO101\nLIGHT_MOD=AV101\nRM_OCC=BI101',
 };
 const maps = { ...DEFAULT_MAPS, ...store.get('maps', {}) };
+const symbols = { ...DEFAULT_SYMBOL, ...store.get('symbols', {}) };
 const parseMap = (txt) => (txt || '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
   .map((l) => { const i = l.indexOf('='); return i < 0 ? [l, ''] : [l.slice(0, i).trim(), l.slice(i + 1).trim()]; });
 
@@ -105,7 +126,7 @@ const TAG_RE = /^[A-Z]{1,5}-[A-Z0-9]+(?:-[A-Z0-9]+)*$/i;
 const fixCase = (s) => s.replace(/'S\b/g, "'s").replace(/\s+/g, ' ').trim();
 
 function parseRooms(text) {
-  return text.split(',').map((r) => fixCase(r)).filter(Boolean).map((r) => {
+  return (text || '').split(',').map((r) => fixCase(r)).filter(Boolean).map((r) => {
     const m = r.match(/^(.*?)\s+([A-Z]?\d+[A-Z]?)$/i);
     return m ? { name: m[1], number: m[2] } : { name: r, number: '' };
   });
@@ -118,19 +139,16 @@ function parseDevice(name, instance) {
   if (idx < 0) idx = tokens.findIndex((t) => TAG_RE.test(t.replace(/,$/, '')));
   const tag = idx >= 0 ? tokens[idx].replace(/,$/, '').toUpperCase() : '';
   const rest = idx >= 0 ? [...tokens.slice(0, idx), ...tokens.slice(idx + 1)].join(' ') : clean;
-  const prefix = tag.split('-')[0];
-  const type = PREFIXES[prefix] || 'OTHER';
+  const type = PREFIXES[tag.split('-')[0]] || 'OTHER';
   const roomType = isRoomType(type);
   return {
     include: true,
     instance: String(instance).trim(),
-    rawName: name,
     tag: tag || clean,
     type,
     desc: roomType ? '' : fixCase(rest),
     rooms: roomType ? fixCase(rest) : '',
     servedBy: '',
-    level: '',
     note: name.includes('//') ? name.split('//').slice(1).join('//').trim() : '',
   };
 }
@@ -147,21 +165,61 @@ function linkServedBy(devs) {
   });
 }
 
-/* ---------------- state ---------------- */
-let devices = [];
-const form = ['bldg', 'proj', 'site', 'level', 'oadev', 'oat', 'oah', 'pkg', 'theme', 'areas', 'extra'];
-const val = (k) => { const el = $('#f-' + k); return el.type === 'checkbox' ? el.checked : el.value.trim(); };
-const saved = store.get('form', {});
-form.forEach((k) => {
-  const el = $('#f-' + k);
-  if (saved[k] != null) { if (el.type === 'checkbox') el.checked = saved[k]; else el.value = saved[k]; }
+/* ---------------- project state ---------------- */
+const blankBuilding = () => ({ bldg: '', proj: '', projTouched: false, site: '', range: '', city: '', level: '1', oadev: '', oat: '', oah: '', light: false, areas: '', devices: [] });
+let project = store.get('project', null);
+if (!project?.buildings?.length) project = { campus: '', pkg: 'good', theme: 'Nord_Dark', extra: false, active: 0, buildings: [blankBuilding()] };
+const cur = () => project.buildings[project.active];
+const multi = () => project.buildings.length > 1;
+const bName = (b, i) => b.bldg || `Building ${i + 1}`;
+const projName = (b, i) => b.proj || (b.bldg ? b.bldg.replace(/[^A-Za-z0-9]/g, '') : `Building${i + 1}`);
+function saveProject() { store.set('project', project); }
+
+const P_FIELDS = ['campus', 'pkg', 'theme', 'extra'];
+const B_FIELDS = ['bldg', 'proj', 'site', 'range', 'city', 'level', 'oadev', 'oat', 'oah', 'light', 'areas'];
+const setField = (el, v) => { if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; };
+const readField = (el) => (el.type === 'checkbox' ? el.checked : el.value.trim());
+P_FIELDS.forEach((k) => {
+  const el = $('#p-' + k);
+  setField(el, project[k]);
+  el.addEventListener('input', () => { project[k] = readField(el); saveProject(); renderDerived(); });
+});
+B_FIELDS.forEach((k) => {
+  const el = $('#b-' + k);
   el.addEventListener('input', () => {
-    if (k === 'bldg' && !$('#f-proj').dataset.touched) $('#f-proj').value = val('bldg').replace(/[^A-Za-z0-9]/g, '');
-    if (k === 'proj') $('#f-proj').dataset.touched = '1';
-    saveForm(); renderAll();
+    const b = cur();
+    b[k] = readField(el);
+    if (k === 'proj') b.projTouched = true;
+    if (k === 'bldg' && !b.projTouched) { b.proj = b.bldg.replace(/[^A-Za-z0-9]/g, ''); $('#b-proj').value = b.proj; }
+    saveProject();
+    if (k === 'bldg') renderTabs();
+    renderDerived();
   });
 });
-function saveForm() { const o = {}; form.forEach((k) => (o[k] = val(k))); store.set('form', o); }
+function fillBuildingForm() { B_FIELDS.forEach((k) => setField($('#b-' + k), cur()[k])); }
+
+function renderTabs() {
+  $('#bldg-tabs').innerHTML = project.buildings.map((b, i) =>
+    `<button type="button" role="tab" data-tab="${i}" aria-selected="${i === project.active}">${esc(bName(b, i))}</button>`).join('') +
+    '<button type="button" class="add" data-add>+ Add building</button>';
+  const label = multi() ? `for ${bName(cur(), project.active)}` : '';
+  $('#eq-for').textContent = label;
+  $('#areas-for').textContent = label;
+  $('#b-remove').hidden = !multi();
+}
+$('#bldg-tabs').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-tab]');
+  if (t) project.active = Number(t.dataset.tab);
+  else if (e.target.closest('[data-add]')) { project.buildings.push(blankBuilding()); project.active = project.buildings.length - 1; }
+  else return;
+  saveProject(); fillBuildingForm(); renderAll();
+});
+$('#b-remove').addEventListener('click', () => {
+  if (!multi() || !confirm(`Remove ${bName(cur(), project.active)} and its equipment list?`)) return;
+  project.buildings.splice(project.active, 1);
+  project.active = Math.max(0, project.active - 1);
+  saveProject(); fillBuildingForm(); renderAll();
+});
 
 /* ---------------- load export ---------------- */
 function loadCSV(text, label) {
@@ -175,17 +233,19 @@ function loadCSV(text, label) {
   const iSite = col('site');
   if (iName < 0 || iDev < 0) return toast('Expected "Device Name" and "Device" columns');
   const body = rows.slice(1).filter((r) => iRef < 0 || /\.DEV\d+/i.test(r[iRef] || '') || !r[iRef]);
-  devices = body.filter((r) => r[iName] && r[iDev]).map((r) => parseDevice(r[iName], r[iDev]));
-  devices.sort((a, b) => Number(a.instance) - Number(b.instance));
-  linkServedBy(devices);
-  if (iSite >= 0 && body[0]?.[iSite] && !val('site')) $('#f-site').value = body[0][iSite];
-  if (!val('bldg')) {
-    const air = devices.find((d) => TYPES[d.type].section === 'AIR' && d.desc);
-    if (air) { $('#f-bldg').value = air.desc; if (!$('#f-proj').dataset.touched) $('#f-proj').value = air.desc.replace(/[^A-Za-z0-9]/g, ''); }
-  }
-  if (!val('oadev')) { const air = devices.find((d) => TYPES[d.type].section === 'AIR'); if (air) $('#f-oadev').value = air.instance; }
-  saveForm();
-  toast(`Loaded ${devices.length} devices from ${label}`);
+  const b = cur();
+  b.devices = body.filter((r) => r[iName] && r[iDev]).map((r) => parseDevice(r[iName], r[iDev]));
+  b.devices.sort((x, y) => Number(x.instance) - Number(y.instance));
+  linkServedBy(b.devices);
+  if (iSite >= 0 && body[0]?.[iSite] && !b.site) b.site = body[0][iSite];
+  const inst = b.devices.map((d) => Number(d.instance)).filter((n) => !Number.isNaN(n));
+  if (inst.length && !b.range) b.range = `${Math.floor(Math.min(...inst) / 100) * 100}/${Math.floor(Math.max(...inst) / 100) * 100 + 99}`;
+  const air = b.devices.find((d) => TYPES[d.type].section === 'AIR');
+  if (!b.bldg && air?.desc) { b.bldg = air.desc; if (!b.projTouched) b.proj = air.desc.replace(/[^A-Za-z0-9]/g, ''); }
+  if (!b.oadev && air) b.oadev = air.instance;
+  saveProject();
+  fillBuildingForm();
+  toast(`Loaded ${b.devices.length} devices from ${label}`);
   renderAll();
 }
 
@@ -193,21 +253,22 @@ const drop = $('#drop');
 ['dragenter', 'dragover'].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach((e) => drop.addEventListener(e, () => drop.classList.remove('over')));
 drop.addEventListener('drop', (ev) => { ev.preventDefault(); const f = ev.dataTransfer.files[0]; if (f) f.text().then((t) => loadCSV(t, f.name)); });
-$('#file').addEventListener('change', (ev) => { const f = ev.target.files[0]; if (f) f.text().then((t) => loadCSV(t, f.name)); });
+$('#file').addEventListener('change', (ev) => { const f = ev.target.files[0]; if (f) f.text().then((t) => loadCSV(t, f.name)); ev.target.value = ''; });
 $('#paste-btn').addEventListener('click', () => { $('#paste').hidden = false; $('#paste-use').hidden = false; $('#paste').focus(); });
 $('#paste-use').addEventListener('click', () => loadCSV($('#paste').value, 'pasted text'));
 $('#sample-btn').addEventListener('click', () => fetch('sample-objectlist.csv').then((r) => r.text()).then((t) => {
-  ['bldg', 'proj', 'site', 'oadev'].forEach((k) => ($('#f-' + k).value = ''));
-  delete $('#f-proj').dataset.touched;
-  if (!val('areas')) $('#f-areas').value = 'Overall Building\nClassroom Wing\nGym';
+  const b = cur();
+  Object.assign(b, { bldg: '', proj: '', projTouched: false, site: '', range: '', oadev: '' });
+  if (!b.areas) b.areas = 'Overall Building\nClassroom Wing\nGym';
   loadCSV(t, 'the sample');
 }).catch(() => toast('Sample needs the page served over http')));
 
 /* ---------------- equipment table ---------------- */
 const typeOptions = (sel) => Object.keys(TYPES).map((t) => `<option ${t === sel ? 'selected' : ''}>${t}</option>`).join('');
 function renderEquipment() {
+  const devices = cur().devices;
   $('#eq-wrap').hidden = !devices.length;
-  if (!devices.length) { $('#eq-summary').textContent = 'No devices loaded yet.'; return; }
+  if (!devices.length) { $('#eq-summary').textContent = 'No devices loaded for this building yet.'; return; }
   const counts = {};
   devices.filter((d) => d.include).forEach((d) => (counts[d.type] = (counts[d.type] || 0) + 1));
   $('#eq-summary').innerHTML = `<b>${devices.filter((d) => d.include).length}</b> devices: ` +
@@ -224,75 +285,111 @@ function renderEquipment() {
 }
 $('#eq-table').addEventListener('change', (e) => {
   const tr = e.target.closest('tr[data-i]'); if (!tr) return;
-  const d = devices[tr.dataset.i]; const k = e.target.dataset.k;
+  const d = cur().devices[tr.dataset.i]; const k = e.target.dataset.k;
   d[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value.trim();
-  if (k === 'type' || k === 'include') renderEquipment();
+  saveProject();
+  if (k === 'type' || k === 'include') { renderEquipment(); renderObjects(); }
   renderDerived();
 });
 
 /* ---------------- object map editors ---------------- */
-function renderObjects() {
-  const used = [...new Set(devices.filter((d) => d.include && TYPES[d.type].section !== 'AIR' && TYPES[d.type].section !== 'PLANT').map((d) => d.type))];
+const allIncluded = () => project.buildings.flatMap((b) => b.devices.filter((d) => d.include));
+function mapTypes() {
+  const used = [...new Set(allIncluded().filter((d) => isRoomType(d.type)).map((d) => d.type))];
   const show = used.length ? used : ['VAV', 'HP'];
-  $('#obj-grid').innerHTML = show.map((t) => {
-    const empty = parseMap(maps[t]).filter(([, v]) => !v).length;
-    return `<label>${t} <span class="hint">${TYPES[t].label}</span>${empty ? `<span class="obj-empty">${empty} object${empty > 1 ? 's' : ''} not filled in</span>` : ''}
-      <textarea data-type="${t}" spellcheck="false">${esc(maps[t] || '')}</textarea></label>`;
+  if (project.buildings.some((b) => b.light) && !show.includes('LIGHT')) show.push('LIGHT');
+  return show;
+}
+function renderObjects() {
+  $('#obj-grid').innerHTML = mapTypes().map((t) => {
+    const m = parseMap(maps[t]);
+    const empty = m.filter(([, v]) => !v).length;
+    const bad = m.map(([c]) => c).filter((c) => !colKnown(c));
+    const sym = symbols[t] || '';
+    return `<div class="obj-card"><div class="obj-head">${t} <span class="hint">${esc(TYPES[t]?.label || 'Lighting')}</span></div>
+      <label class="hint">Room view symbol
+        <select data-sym="${t}"><option value="">(none)</option>${SYMBOLS.map((s) => `<option ${s === sym ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <textarea data-type="${t}" spellcheck="false" aria-label="${t} object map">${esc(maps[t] || '')}</textarea>
+      ${empty ? `<span class="obj-empty">${empty} object${empty > 1 ? 's' : ''} not filled in</span>` : ''}
+      ${bad.length ? `<span class="obj-bad">Not in Delta's column list: ${bad.map(esc).join(', ')}</span>` : ''}
+      <input list="rm-cols" placeholder="Look up a column name…" aria-label="Look up a column name"></div>`;
   }).join('');
 }
 $('#obj-grid').addEventListener('change', (e) => {
-  const t = e.target.dataset.type; if (!t) return;
-  maps[t] = e.target.value;
-  const custom = store.get('maps', {}); custom[t] = e.target.value; store.set('maps', custom);
+  const t = e.target.dataset.type;
+  const s = e.target.dataset.sym;
+  if (t) { maps[t] = e.target.value; const c = store.get('maps', {}); c[t] = e.target.value; store.set('maps', c); }
+  else if (s) { symbols[s] = e.target.value; const c = store.get('symbols', {}); c[s] = e.target.value; store.set('symbols', c); }
+  else if (e.target.list) {
+    const v = e.target.value.trim();
+    const hit = STRUCT.get(v);
+    toast(hit ? `${v}: ${hit.en}${hit.ro ? ' (read only)' : ''}` : `${v} isn't in Delta's list`);
+    return;
+  } else return;
   renderObjects(); renderDerived();
 });
 
 /* ---------------- builders ---------------- */
 const alias = (s) => s.replace(/[^A-Za-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-const included = () => devices.filter((d) => d.include);
+const included = (b) => b.devices.filter((d) => d.include);
+const areasOf = (b) => (b.areas || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
-function roomRows() {
+function roomRows(b) {
   const rows = [];
-  included().filter((d) => isRoomType(d.type)).forEach((d) => {
+  included(b).filter((d) => isRoomType(d.type)).forEach((d) => {
     const list = parseRooms(d.rooms);
     (list.length ? list : [{ name: d.tag, number: '' }]).forEach((r) => rows.push({ d, room: r.number || r.name, en: r.number ? `${r.name} ${r.number}` : r.name }));
   });
   return rows;
 }
 
-function buildRoomCSV() {
-  const objCols = [];
+function buildRoomCSV(b) {
+  const lvl = b.level || '1';
+  const rr = roomRows(b);
+  const types = [...new Set(rr.map((r) => r.d.type))];
+  if (b.light) types.push('LIGHT');
   const typeMaps = {};
-  [...new Set(included().map((d) => d.type))].forEach((t) => {
-    typeMaps[t] = parseMap(maps[t]);
-    typeMaps[t].forEach(([c]) => { if (!objCols.includes(c)) objCols.push(c); });
+  const objCols = [];
+  types.forEach((t) => {
+    typeMaps[t] = Object.fromEntries(parseMap(maps[t]));
+    Object.keys(typeMaps[t]).forEach((c) => { if (!objCols.includes(c)) objCols.push(c); });
   });
-  const head = ['address', 'room', 'level', 'en', 'equipmentType', 'equipmentTag', 'equipmentSymbol', 'servedBy', 'sys', 'folder', 'pageInclude', 'HAL', ...objCols];
-  const lvl = val('level') || '1';
-  const rows = roomRows().map(({ d, room, en }) => {
-    const m = Object.fromEntries(typeMaps[d.type] || []);
-    return [d.instance, room, d.level || lvl, en, d.type, d.tag, d.type, d.servedBy, d.servedBy, 'summary', 'room', 'HVAC', ...objCols.map((c) => m[c] || '')];
-  });
+  const head = ['address', 'room', 'level', 'en', 'equipmentType', 'equipmentTag', 'equipmentSymbol', 'sys', 'folder', 'pageInclude', 'HAL', ...objCols];
+  const row = (addr, room, en, type, tag, sys, hal) =>
+    [addr, room, lvl, en, type, tag, symbols[type] || '', sys, '', 'room', hal, ...objCols.map((c) => typeMaps[type][c] || '')];
+  const rows = rr.map(({ d, room, en }) => row(d.instance, room, en, d.type, d.tag, d.servedBy, 'HVAC'));
+  if (b.light) {
+    // One lighting row per room, on the first controller serving it. Change the address if lights are on a separate controller.
+    const seen = new Set();
+    rr.forEach(({ d, room, en }) => { if (!seen.has(room)) { seen.add(room); rows.push(row(d.instance, room, en, 'LIGHT', `L-${room}`, '', 'LIGHT')); } });
+  }
   return toCSV([head, ...rows]);
 }
 
-function buildProjectCSV() {
-  const bldg = val('bldg') || 'Building';
-  const head = ['menu', 'pageAlias', 'en', 'buttonSuffix', 'folder', 'pageInclude', 'zoomEnabled', 'overlayEnabled', 'address', 'systemFilter', 'forceInfoPanelObj', 'title', 'subTitle', 'subTitlePrefix', 'subTitleSuffix', 'blacklist'];
-  const R = (menu, pa, en, folder = '', inc = '', o = {}) => [menu, pa, en, '', folder, inc, '', o.overlay ? 'true' : '', o.address || '', '', '', inc ? bldg : '', inc ? (o.sub || en) : '', '', '', ''];
+const NAV_HEAD = ['menu', 'pageAlias', 'en', 'buttonSuffix', 'folder', 'pageInclude', 'zoomEnabled', 'overlayEnabled', 'address', 'systemFilter', 'forceInfoPanelObj', 'title', 'subTitle', 'subTitlePrefix', 'subTitleSuffix', 'blacklist'];
+
+// Titles and subtitles are translation aliases; tr collects ALIAS -> text for Translation.csv.
+function buildNavCSV(b, i, tr) {
+  const proj = projName(b, i);
+  const tTitle = `T_${proj}`;
+  tr[tTitle] = b.bldg || proj;
+  const R = (menu, pa, en, folder = '', inc = '', o = {}) => {
+    let sub = '';
+    if (inc) { sub = `ST_${proj}_${pa}`; tr[sub] = o.sub || en; }
+    return [menu, pa, en, '', folder, inc, '', o.overlay ? 'true' : '', o.address || '', '', '', inc ? tTitle : '', sub, '', '', ''];
+  };
   const H = (menu, en) => R(menu, menu, en);
   const rows = [R('HOME', 'Main', 'Home', 'home', 'homePage', { sub: 'Home' })];
-  const used = new Set();
+  const used = new Set(['Main']);
   const uniq = (a) => { let x = a; let n = 2; while (used.has(x)) x = `${a}_${n++}`; used.add(x); return x; };
-  used.add('Main');
 
-  const areas = val('areas').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const areas = areasOf(b).map((a) => ({ a, pa: uniq(alias(a) + '_FP') }));
   if (areas.length) {
     rows.push(H('FP', 'Floor Plans'), H('FP', 'AREAS'));
-    areas.forEach((a) => { const pa = uniq(alias(a) + '_FP'); rows.push(R('FP', pa, a, 'floorplans', pa, { overlay: true, sub: `${a} Floor Plan` })); });
+    areas.forEach(({ a, pa }) => rows.push(R('FP', pa, a, 'floorplans', pa, { overlay: true, sub: `${a} Floor Plan` })));
   }
   for (const [sec, secName] of SECTIONS) {
-    const devs = included().filter((d) => TYPES[d.type].section === sec);
+    const devs = included(b).filter((d) => TYPES[d.type].section === sec);
     if (!devs.length) continue;
     rows.push(H(sec, secName));
     const types = [...new Set(devs.map((d) => d.type))];
@@ -313,31 +410,50 @@ function buildProjectCSV() {
         const pa = uniq(`${t}_Summary`);
         rows.push(R(sec, pa, `${TYPES[t].label} Summary`, 'summary', pa));
       });
+      if (sec === 'TU') { rows.push(H(sec, 'ROOMS')); rows.push(R(sec, uniq('Room_Summary'), 'Room Summary', 'roomControl', 'roomControlTable')); }
     }
   }
-  if (val('extra')) {
-    rows.push(H('DASH', 'Dashboards'), R('DASH', 'Bldg_Summary', 'Building Summary', 'dashboards', 'Bldg_Summary'));
-    rows.push(H('ALARM', 'Alarms'), R('ALARM', 'Active_Alarms', 'Active Alarms', 'alarms', 'Active_Alarms'));
-    rows.push(H('TREND', 'Trends'), R('TREND', 'Trend_Viewer', 'Trend Viewer', 'trends', 'Trend_Viewer'));
-    rows.push(H('SCHED', 'Schedules'), R('SCHED', 'Bldg_Schedules', 'Building Schedules', 'schedules', 'Bldg_Schedules'));
+  if (b.light) {
+    // menu LIGHT switches the room control mode; same floor plan files, new page aliases.
+    rows.push(H('LIGHT', 'Lighting'));
+    if (areas.length) {
+      rows.push(H('LIGHT', 'FLOOR PLANS'));
+      areas.forEach(({ a, pa }) => rows.push(R('LIGHT', uniq(`${pa}_Light`), a, 'floorplans', pa, { overlay: true, sub: `${a} Lighting` })));
+    }
+    rows.push(H('LIGHT', 'ROOMS'), R('LIGHT', uniq('Room_Summary_Light'), 'Room Summary', 'roomControl', 'roomControlTable', { sub: 'Lighting Room Summary' }));
+  }
+  if (project.extra) {
+    rows.push(H('DASH', 'Dashboards'), R('DASH', uniq('Bldg_Summary'), 'Building Summary', 'dashboards', 'Bldg_Summary'));
+    rows.push(H('ALARM', 'Alarms'), R('ALARM', uniq('Active_Alarms'), 'Active Alarms', 'alarms', 'Active_Alarms'));
+    rows.push(H('TREND', 'Trends'), R('TREND', uniq('Trend_Viewer'), 'Trend Viewer', 'trends', 'Trend_Viewer'));
+    rows.push(H('SCHED', 'Schedules'), R('SCHED', uniq('Bldg_Schedules'), 'Building Schedules', 'schedules', 'Bldg_Schedules'));
     rows.push(H('RPT', 'Reports'));
     [['Rpt_Overrides', 'Overrides'], ['Rpt_AlarmHistory', 'Alarm History'], ['Rpt_Faults', 'Points in Fault/Offline'], ['Rpt_Runtime', 'Runtime Hours']]
-      .forEach(([pa, en]) => rows.push(R('RPT', pa, en, 'reports', pa)));
-    rows.push(H('LEGEND', 'Legend'), R('LEGEND', 'Legend', 'Symbols & Colors', 'legend', 'Legend'));
+      .forEach(([pa, en]) => rows.push(R('RPT', uniq(pa), en, 'reports', pa)));
+    rows.push(H('LEGEND', 'Legend'), R('LEGEND', uniq('Legend'), 'Symbols & Colors', 'legend', 'Legend'));
   }
-  return toCSV([head, ...rows]);
+  return toCSV([NAV_HEAD, ...rows]);
+}
+
+const campusName = () => project.campus || project.buildings[0]?.bldg || 'Campus';
+
+function buildCampusCSV(tr) {
+  tr.MAIN_T = campusName(); // Delta's stock pages use MAIN_T for the project name
+  tr.T_CAMPUS = campusName();
+  tr.ST_CAMPUS = 'Campus';
+  return toCSV([NAV_HEAD, ['HOME', 'Main', 'Home', '', 'home', 'homePage', '', '', '', '', '', 'T_CAMPUS', 'ST_CAMPUS', '', '', '']]);
 }
 
 function buildBuildingsCSV() {
-  const proj = val('proj') || 'Building';
-  const site = val('site');
-  const inst = included().map((d) => Number(d.instance)).filter((n) => !Number.isNaN(n));
-  const lo = inst.length ? Math.floor(Math.min(...inst) / 100) * 100 : '';
-  const hi = inst.length ? Math.floor(Math.max(...inst) / 100) * 100 + 99 : '';
   const head = ['en', 'projCSV', 'roomCSV', 'projTranslation', 'siteInformationList', 'city', 'conditionsDev', 'OAT', 'OAH', 'blacklist', 'CAL', 'URL'];
-  const row = [val('bldg') || proj, proj, `${proj}_RoomControl`, '', site && lo !== '' ? `${site}/${lo}/${hi}` : '', '',
-    site && val('oadev') ? `/Network/${site}/${val('oadev')}/` : '', val('oat'), val('oah'), '', '', ''];
-  return toCSV([head, row]);
+  // Campus must be the first row; enteliVIZ hides it when there's only one building.
+  const rows = [[campusName(), 'Campus', '', '', '', project.buildings[0]?.city || '', '', '', '', '', '', '']];
+  project.buildings.forEach((b, i) => {
+    const proj = projName(b, i);
+    rows.push([b.bldg || proj, proj, `${proj}_RoomControl`, '', b.site && b.range ? `${b.site}/${b.range}` : '', b.city,
+      b.site && b.oadev ? `/Network/${b.site}/${b.oadev}/` : '', b.oat, b.oah, '', '', '']);
+  });
+  return toCSV([head, ...rows]);
 }
 
 const buildOverlays = () => JSON.stringify([{
@@ -346,12 +462,21 @@ const buildOverlays = () => JSON.stringify([{
 }], null, 4);
 
 function files() {
-  const proj = val('proj') || 'Building';
+  const tr = {};
+  const out = [];
+  const campus = buildCampusCSV(tr);
+  project.buildings.forEach((b, i) => {
+    const proj = projName(b, i);
+    out.push({ path: `_Proj_Lib/CSV/${proj}.csv`, what: `${bName(b, i)}: navigation`, body: buildNavCSV(b, i, tr) });
+    out.push({ path: `_Proj_Lib/CSV/${proj}_RoomControl.csv`, what: `${bName(b, i)}: rooms${b.light ? ', terminal units and lighting' : ' and terminal units'}`, body: buildRoomCSV(b) });
+  });
+  const trCSV = toCSV([['ALIAS', 'en'], ...Object.entries(tr)]);
   return [
-    { path: `_Proj_Lib/CSV/${proj}.csv`, what: 'Navigation (project CSV)', body: buildProjectCSV() },
-    { path: `_Proj_Lib/CSV/${proj}_RoomControl.csv`, what: 'Rooms and terminal units', body: buildRoomCSV() },
-    { path: '_Proj_Lib/CSV/Buildings.csv', what: 'Building row (merge if the project has other buildings)', body: buildBuildingsCSV() },
-    { path: 'assets/CSV/CSS.json', what: `Themes: Delta stock + Nord. Set selectedTheme to ${val('theme')}`, body: JSON.stringify(CSS_THEMES, null, 4) },
+    { path: '_Proj_Lib/CSV/Buildings.csv', what: 'Campus and building list (project.df5 buildingCSV)', body: buildBuildingsCSV() },
+    { path: '_Proj_Lib/CSV/Campus.csv', what: 'Campus page navigation', body: campus },
+    ...out,
+    { path: '_Proj_Lib/CSV/Translation.csv', what: 'Page titles for every building (project.df5 projectTranslationCSV)', body: trCSV },
+    { path: 'assets/CSV/CSS.json', what: `Themes: Delta stock + Nord. Set selectedTheme to ${project.theme}`, body: JSON.stringify(CSS_THEMES, null, 4) },
     { path: 'assets/CSV/floorplanOverlays.json', what: 'Floor plan zone colors', body: buildOverlays() },
   ];
 }
@@ -359,41 +484,49 @@ function files() {
 /* ---------------- render derived ---------------- */
 function warnings() {
   const w = [];
-  if (!devices.length) w.push('Load the enteliWEB device list in step 2.');
-  if (!val('bldg')) w.push('Building name is empty.');
-  if (!val('oat') || !val('oah')) w.push('Outdoor air temp and humidity objects are empty, so the header won\'t show outdoor conditions.');
-  const tags = included().map((d) => d.tag);
-  const dup = tags.filter((t, i) => tags.indexOf(t) !== i);
-  if (dup.length) w.push(`Duplicate tags: ${[...new Set(dup)].join(', ')}.`);
-  const types = [...new Set(included().filter((d) => isRoomType(d.type)).map((d) => d.type))];
-  types.forEach((t) => {
-    const m = parseMap(maps[t]);
-    if (!m.find(([c, v]) => c === 'RM_T' && v)) w.push(`${t}: RM_T (room temp object) isn't set in the object map, so floor plan colors won't work for ${t}s.`);
+  const projs = project.buildings.map(projName);
+  const dupProj = projs.filter((p, i) => projs.indexOf(p) !== i);
+  if (dupProj.length) w.push(`Two buildings use the same nav CSV name: ${[...new Set(dupProj)].join(', ')}.`);
+  project.buildings.forEach((b, i) => {
+    const pre = multi() ? `${bName(b, i)}: ` : '';
+    if (!b.devices.length) w.push(`${pre}load the enteliWEB device list in step 2.`);
+    if (!b.bldg) w.push(`${pre}building name is empty.`);
+    if (!b.site || !b.range) w.push(`${pre}site or device range is empty, so enteliVIZ can't tell which devices belong to this building.`);
+    if (!b.oat || !b.oah) w.push(`${pre}outdoor air temp and humidity objects are empty, so the header won't show outdoor conditions.`);
+    const tags = included(b).map((d) => d.tag);
+    const dup = tags.filter((t, j) => tags.indexOf(t) !== j);
+    if (dup.length) w.push(`${pre}duplicate tags ${[...new Set(dup)].join(', ')}.`);
+    const noRooms = included(b).filter((d) => isRoomType(d.type) && !parseRooms(d.rooms).length);
+    if (noRooms.length) w.push(`${pre}no rooms parsed for ${noRooms.map((d) => d.tag).join(', ')}.`);
+    if (b.light && !areasOf(b).length) w.push(`${pre}lighting is on but there are no floor plan areas, so the Lighting section only has the room summary.`);
   });
-  const noRooms = included().filter((d) => isRoomType(d.type) && !parseRooms(d.rooms).length);
-  if (noRooms.length) w.push(`No rooms parsed for ${noRooms.map((d) => d.tag).join(', ')}.`);
-  const unfed = included().filter((d) => isRoomType(d.type) && TYPES[d.type].section === 'TU' && d.type === 'VAV' && !d.servedBy);
-  if (unfed.length) w.push(`No "served by" unit for ${unfed.length} VAV${unfed.length > 1 ? 's' : ''}.`);
+  const types = [...new Set(allIncluded().filter((d) => isRoomType(d.type)).map((d) => d.type))];
+  types.forEach((t) => {
+    if (!parseMap(maps[t]).find(([c, v]) => c === 'RM_T' && v)) w.push(`${t}: RM_T (room temp object) isn't set in the object map, so floor plan colors won't work for ${t}s.`);
+    if (!symbols[t]) w.push(`${t}: no room view symbol picked, so the equipment preview won't show on the room page.`);
+  });
   return w;
 }
 
 function renderDerived() {
-  const rr = roomRows();
+  const b = cur();
+  const rr = roomRows(b);
   $('#rm-wrap').hidden = !rr.length;
   const byRoom = {};
   rr.forEach((r) => (byRoom[r.room] = (byRoom[r.room] || []).concat(r.d.tag)));
   const shared = Object.entries(byRoom).filter(([, t]) => t.length > 1);
   $('#rm-summary').innerHTML = rr.length
-    ? `<b>${Object.keys(byRoom).length}</b> rooms, <b>${rr.length}</b> rows.` + (shared.length ? ` Served by more than one unit: ${shared.map(([r, t]) => `${esc(r)} (${t.map(esc).join(', ')})`).join('; ')}.` : '')
+    ? `<b>${Object.keys(byRoom).length}</b> rooms, <b>${rr.length}</b> HVAC rows${b.light ? ` and <b>${Object.keys(byRoom).length}</b> lighting rows` : ''}.` +
+      (shared.length ? ` Served by more than one unit: ${shared.map(([r, t]) => `${esc(r)} (${t.map(esc).join(', ')})`).join('; ')}.` : '')
     : 'Rooms appear here once equipment is loaded.';
-  $('#rm-table').innerHTML = '<thead><tr><th>room</th><th>en</th><th>equipmentTag</th><th>address</th><th>servedBy</th></tr></thead><tbody>' +
+  $('#rm-table').innerHTML = '<thead><tr><th>room</th><th>en</th><th>equipmentTag</th><th>address</th><th>sys (served by)</th></tr></thead><tbody>' +
     rr.map(({ d, room, en }) => `<tr><td>${esc(room)}</td><td>${esc(en)}</td><td>${esc(d.tag)}</td><td>${esc(d.instance)}</td><td>${esc(d.servedBy)}</td></tr>`).join('') + '</tbody>';
 
-  $('#warnings').innerHTML = warnings().map((w) => `<div class="warn">${esc(w)}</div>`).join('');
+  $('#warnings').innerHTML = warnings().map((w) => `<div class="warn">${esc(w[0].toUpperCase() + w.slice(1))}</div>`).join('');
   $('#file-list').innerHTML = files().map((f, i) => `<div class="file"><div class="file-h"><span><code>${esc(f.path)}</code> <span class="hint">${esc(f.what)}</span></span>
     <button class="btn" data-dl="${i}" type="button">Download</button></div><pre>${esc(f.body.length > 6000 ? f.body.slice(0, 6000) + '\n…' : f.body)}</pre></div>`).join('');
 }
-function renderAll() { renderEquipment(); renderObjects(); renderDerived(); }
+function renderAll() { renderTabs(); renderEquipment(); renderObjects(); renderDerived(); }
 
 /* ---------------- downloads ---------------- */
 const enc = new TextEncoder();
@@ -405,8 +538,8 @@ function save(name, blob) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 $('#file-list').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-dl]'); if (!b) return;
-  const f = files()[b.dataset.dl];
+  const btn = e.target.closest('[data-dl]'); if (!btn) return;
+  const f = files()[btn.dataset.dl];
   save(f.path.split('/').pop(), new Blob([f.body], { type: 'text/plain' }));
 });
 
@@ -437,14 +570,16 @@ function zip(entries) {
   return new Blob([...parts, ...central, end], { type: 'application/zip' });
 }
 $('#zip-btn').addEventListener('click', () => {
-  if (!devices.length) return toast('Load the device list first');
-  const proj = val('proj') || 'Building';
-  const readme = `ENTEC enteliVIZ files for ${val('bldg') || proj}\nGenerated ${new Date().toLocaleString()}\n\n` +
-    files().map((f) => `${f.path}\n  ${f.what}`).join('\n') +
-    `\n\nAfter copying into the project:\n- project.df5: set selectedTheme to ${val('theme')}\n- Main.dg5: set alarmCounter to true\n- Draw the pages named in ${proj}.csv in the designer\n` +
-    (warnings().length ? `\nWarnings:\n${warnings().map((w) => '- ' + w).join('\n')}\n` : '');
-  const entries = [...files().map((f) => ({ name: f.path, data: enc.encode(f.body) })), { name: 'README.txt', data: enc.encode(readme) }];
-  save(`${proj}_enteliVIZ_files.zip`, zip(entries));
+  if (!allIncluded().length) return toast('Load a device list first');
+  const fs = files();
+  const ws = warnings();
+  const readme = `ENTEC enteliVIZ files for ${campusName()}\nGenerated ${new Date().toLocaleString()}\n\n` +
+    fs.map((f) => `${f.path}\n  ${f.what}`).join('\n') +
+    `\n\nAfter copying into the project:\n- project.df5: buildingCSV = _Proj_Lib/CSV/Buildings.csv, projectTranslationCSV = _Proj_Lib/CSV/Translation.csv\n- project.df5: selectedTheme = ${project.theme}\n- Main.dg5: alarmCounter = true\n- Draw the pages named in each building's nav CSV in the designer\n` +
+    (ws.length ? `\nWarnings:\n${ws.map((w) => '- ' + w).join('\n')}\n` : '');
+  const entries = [...fs.map((f) => ({ name: f.path, data: enc.encode(f.body) })), { name: 'README.txt', data: enc.encode(readme) }];
+  save(`${alias(campusName())}_enteliVIZ_files.zip`, zip(entries));
 });
 
+fillBuildingForm();
 renderAll();

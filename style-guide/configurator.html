@@ -27,7 +27,7 @@
   <div class="side-head">Style guide</div>
   <a href="index.html">‹ Back to the guide</a>
   <div class="side-head">Configurator</div>
-  <a href="#building">1. Building</a>
+  <a href="#building">1. Project and buildings</a>
   <a href="#equipment">2. Equipment</a>
   <a href="#rooms">3. Rooms</a>
   <a href="#objects">4. Object map</a>
@@ -45,26 +45,38 @@
 
 <!-- 1 -->
 <section id="building">
-  <h2>1. Building</h2>
+  <h2>1. Project and buildings</h2>
   <div class="form-grid">
-    <label>Building name<input id="f-bldg" placeholder="Performing Arts Center"></label>
-    <label>Project CSV name <span class="hint">no spaces, unique per building</span><input id="f-proj" placeholder="PerformingArts"></label>
-    <label>Site <span class="hint">filled from the export</span><input id="f-site" placeholder="SITE"></label>
-    <label>Default level<input id="f-level" value="1"></label>
-    <label>Outdoor air device instance<input id="f-oadev" placeholder="360400"></label>
-    <label>Outdoor air temp object<input id="f-oat" placeholder="AI1301"></label>
-    <label>Outdoor air humidity object<input id="f-oah" placeholder="AI1302"></label>
+    <label>Campus / project name <span class="hint">shown on the campus page; one-building jobs can leave it blank</span><input id="p-campus" placeholder="Brown County School District"></label>
     <label>Package
-      <select id="f-pkg"><option value="good">Good (Basic)</option><option value="better" disabled>Better (not defined yet)</option><option value="best" disabled>Best (not defined yet)</option></select></label>
+      <select id="p-pkg"><option value="good">Good (Basic)</option><option value="better" disabled>Better (not defined yet)</option><option value="best" disabled>Best (not defined yet)</option></select></label>
     <label>Theme
-      <select id="f-theme"><option>Nord_Dark</option><option>Nord_Light</option></select></label>
+      <select id="p-theme"><option>Nord_Dark</option><option>Nord_Light</option></select></label>
   </div>
-  <label class="check"><input type="checkbox" id="f-extra"> Add Dashboards, Alarms, Trends, Schedules, Reports and Legend rows to the nav <span class="hint">only if those pages exist in the project</span></label>
+  <label class="check"><input type="checkbox" id="p-extra"> Add Dashboards, Alarms, Trends, Schedules, Reports and Legend rows to each building's nav <span class="hint">only if those pages exist in the project</span></label>
+
+  <h3>Buildings <span class="hint">steps 2, 3 and 5 apply to the building picked here</span></h3>
+  <div class="bldg-tabs" id="bldg-tabs" role="tablist"></div>
+  <div class="bldg-card">
+    <div class="form-grid">
+      <label>Building name<input id="b-bldg" placeholder="Brown County High School"></label>
+      <label>Nav CSV name <span class="hint">no spaces, unique per building</span><input id="b-proj" placeholder="BCHighSchool"></label>
+      <label>Site <span class="hint">filled from the export</span><input id="b-site" placeholder="SITE"></label>
+      <label>Device range <span class="hint">filled from the export: min/max</span><input id="b-range" placeholder="10000/10999"></label>
+      <label>City <span class="hint">for the weather</span><input id="b-city" placeholder="Green Bay"></label>
+      <label>Default level<input id="b-level" value="1"></label>
+      <label>Outdoor air device instance<input id="b-oadev" placeholder="10000"></label>
+      <label>Outdoor air temp object<input id="b-oat" placeholder="AI1301"></label>
+      <label>Outdoor air humidity object<input id="b-oah" placeholder="AI1302"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="b-light"> This building has lighting control <span class="hint">adds a Lighting section and a LIGHT row for every room</span></label>
+    <p><button class="btn" id="b-remove" type="button">Remove this building</button></p>
+  </div>
 </section>
 
 <!-- 2 -->
 <section id="equipment">
-  <h2>2. Equipment</h2>
+  <h2>2. Equipment <span class="hint" id="eq-for"></span></h2>
   <p class="lead">In enteliWEB, export the device list as CSV and drop it here. Device names follow <code>TAG Room Name 101, Room Name 102</code>; anything after <code>//</code> is ignored.</p>
   <div class="drop" id="drop">
     <p><b>Drop the CSV here</b> or <label class="linkish">choose a file<input type="file" id="file" accept=".csv,text/csv" hidden></label></p>
@@ -97,9 +109,9 @@
 
 <!-- 5 -->
 <section id="areas">
-  <h2>5. Floor plan areas</h2>
+  <h2>5. Floor plan areas <span class="hint" id="areas-for"></span></h2>
   <p class="lead">One area per line. Each becomes a page under Floor Plans with the color overlay turned on.</p>
-  <textarea id="f-areas" class="paste" rows="5" placeholder="Overall Building&#10;First Floor&#10;Second Floor"></textarea>
+  <textarea id="b-areas" class="paste" rows="5" placeholder="Overall Building&#10;First Floor&#10;Second Floor"></textarea>
 </section>
 
 <!-- 6 -->
@@ -110,7 +122,8 @@
   <div id="file-list"></div>
   <h3>After importing</h3>
   <ol class="checklist">
-    <li>Copy the files into the project at the paths shown. Merge the <code>Buildings.csv</code> row into the project's existing file if it has other buildings.</li>
+    <li>Copy the files into the project at the paths shown.</li>
+    <li>In <code>project.df5</code>, point <code>buildingCSV</code> at <code>_Proj_Lib/CSV/Buildings.csv</code> and <code>projectTranslationCSV</code> at <code>_Proj_Lib/CSV/Translation.csv</code>.</li>
     <li>In <code>project.df5</code>, set <code>selectedTheme</code> to the theme picked above.</li>
     <li>In <code>Main.dg5</code>, set <code>alarmCounter</code> to <code>true</code>.</li>
     <li>Draw the floor plan, equipment and summary pages in the designer, using the page names in the project CSV.</li>
