@@ -216,7 +216,7 @@ $('#overlayCode').textContent = JSON.stringify({
 
 /* ---------------- master tag list ---------------- */
 $('#tagTable').innerHTML = '<thead><tr><th>Tag prefix</th><th>What it is</th><th>Type</th><th>Nav section</th><th>Flyout heading</th></tr></thead><tbody>' +
-  TAG_LIST.map(([p, t, what]) => `<tr><td><code>${p}-</code></td><td>${what}</td><td>${t}</td><td>${SECTIONS.find((x) => x[0] === TYPES[t].section)[1]}</td><td>${TYPES[t].heading}</td></tr>`).join('') + '</tbody>';
+  TAG_LIST.map(([p, t, what]) => `<tr><td><code>${p}-</code></td><td>${what}</td><td>${t}</td><td>${SECTIONS.find((x) => x[0] === TYPES[t].section)?.[1] || 'Lighting (room file only)'}</td><td>${TYPES[t].heading}</td></tr>`).join('') + '</tbody>';
 
 /* ---------------- side nav: active section + mobile ---------------- */
 const links = [...document.querySelectorAll('.side a')];

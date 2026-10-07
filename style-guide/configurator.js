@@ -37,9 +37,11 @@ const rebuildPrefixes = () => {
 };
 rebuildPrefixes();
 const isRoomType = (t) => ['TU', 'MISC'].includes(TYPES[t]?.section);
+const isLight = (t) => t === 'LIGHT';
+const hasRooms = (t) => isRoomType(t) || isLight(t);
 
 function renderPrefixes() {
-  const secName = (t) => SECTIONS.find((x) => x[0] === TYPES[t].section)[1];
+  const secName = (t) => SECTIONS.find((x) => x[0] === TYPES[t].section)?.[1] || 'Lighting (room file only)';
   $('#prefix-table').innerHTML = '<thead><tr><th>Tag prefix</th><th>What it is</th><th>Type</th><th>Nav section</th><th>Flyout heading</th><th></th></tr></thead><tbody>' +
     [...TAG_LIST.map((r) => [...r, false]), ...extraTags.map((r, i) => [...r, i])].map(([p, t, what, extra]) =>
       `<tr><td><code>${esc(p)}-</code></td><td>${esc(what)}</td><td>${t}</td><td>${secName(t)}</td><td>${TYPES[t].heading}</td>
@@ -77,10 +79,14 @@ const dl = document.createElement('datalist');
 dl.id = 'rm-cols';
 dl.innerHTML = RMCTRL_STRUCT.map(([a, en]) => `<option value="${esc(a)}">${esc(en)}</option>`).join('');
 document.body.appendChild(dl);
+const SYMBOL_LIST = document.createElement('datalist');
+SYMBOL_LIST.id = 'rm-symbols';
+document.body.appendChild(SYMBOL_LIST);
 
 /* ---------------- object map defaults ---------------- */
 // Room view symbols that exist in Delta's palette/RoomControlEquipment.dg5.
 const SYMBOLS = ['VAV', 'VAV_RH', 'CAV', 'CAV_RH', 'FPB', 'TA', 'FCU_6W_VLV', 'FCU_CLG', 'FCU_FLT_EF', 'CRAC', 'FH', 'IND', 'LIGHT', 'SimpleLight', 'VAV MECH'];
+SYMBOL_LIST.innerHTML = SYMBOLS.map((x) => `<option value="${x}">`).join('');
 const DEFAULT_SYMBOL = { VAV: 'VAV_RH', FPVAV: 'FPB', FCU: 'FCU_6W_VLV', LIGHT: 'LIGHT' };
 // VAV and LIGHT come from Delta's EWM example; the heat pump map is Brown County's. Confirm against ENTEC's programs.
 const DEFAULT_MAPS = {
@@ -140,7 +146,7 @@ function parseDevice(name, instance) {
   const tag = idx >= 0 ? tokens[idx].replace(/,$/, '').toUpperCase() : '';
   const rest = idx >= 0 ? [...tokens.slice(0, idx), ...tokens.slice(idx + 1)].join(' ') : clean;
   const type = PREFIXES[tag.split('-')[0]] || 'OTHER';
-  const roomType = isRoomType(type);
+  const roomType = hasRooms(type);
   return {
     include: true,
     instance: String(instance).trim(),
@@ -280,7 +286,7 @@ function renderEquipment() {
       <td class="tag"><input data-k="tag" value="${esc(d.tag)}"></td>
       <td><select data-k="type">${typeOptions(d.type)}</select></td>
       <td><input data-k="servedBy" value="${esc(d.servedBy)}" ${isRoomType(d.type) ? '' : 'disabled'}></td>
-      <td class="rooms"><input data-k="${isRoomType(d.type) ? 'rooms' : 'desc'}" value="${esc(isRoomType(d.type) ? d.rooms : d.desc)}"></td>
+      <td class="rooms"><input data-k="${hasRooms(d.type) ? 'rooms' : 'desc'}" value="${esc(hasRooms(d.type) ? d.rooms : d.desc)}"></td>
       <td class="muted small">${esc(d.note)}</td></tr>`).join('') + '</tbody>';
 }
 $('#eq-table').addEventListener('change', (e) => {
@@ -297,7 +303,7 @@ const allIncluded = () => project.buildings.flatMap((b) => b.devices.filter((d) 
 function mapTypes() {
   const used = [...new Set(allIncluded().filter((d) => isRoomType(d.type)).map((d) => d.type))];
   const show = used.length ? used : ['VAV', 'HP'];
-  if (project.buildings.some((b) => b.light) && !show.includes('LIGHT')) show.push('LIGHT');
+  if (project.buildings.some(lit) && !show.includes('LIGHT')) show.push('LIGHT');
   return show;
 }
 function renderObjects() {
@@ -308,7 +314,7 @@ function renderObjects() {
     const sym = symbols[t] || '';
     return `<div class="obj-card"><div class="obj-head">${t} <span class="hint">${esc(TYPES[t]?.label || 'Lighting')}</span></div>
       <label class="hint">Room view symbol
-        <select data-sym="${t}"><option value="">(none)</option>${SYMBOLS.map((s) => `<option ${s === sym ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+        <input data-sym="${t}" list="rm-symbols" value="${esc(sym)}" placeholder="Pick or type a symbol name"></label>
       <textarea data-type="${t}" spellcheck="false" aria-label="${t} object map">${esc(maps[t] || '')}</textarea>
       ${empty ? `<span class="obj-empty">${empty} object${empty > 1 ? 's' : ''} not filled in</span>` : ''}
       ${bad.length ? `<span class="obj-bad">Not in Delta's column list: ${bad.map(esc).join(', ')}</span>` : ''}
@@ -332,6 +338,7 @@ $('#obj-grid').addEventListener('change', (e) => {
 /* ---------------- builders ---------------- */
 const alias = (s) => s.replace(/[^A-Za-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 const included = (b) => b.devices.filter((d) => d.include);
+const lit = (b) => b.light || included(b).some((d) => isLight(d.type));
 const areasOf = (b) => (b.areas || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
 function roomRows(b) {
@@ -347,7 +354,7 @@ function buildRoomCSV(b) {
   const lvl = b.level || '1';
   const rr = roomRows(b);
   const types = [...new Set(rr.map((r) => r.d.type))];
-  if (b.light) types.push('LIGHT');
+  if (b.light || included(b).some((d) => isLight(d.type))) types.push('LIGHT');
   const typeMaps = {};
   const objCols = [];
   types.forEach((t) => {
@@ -358,8 +365,15 @@ function buildRoomCSV(b) {
   const row = (addr, room, en, type, tag, sys, hal) =>
     [addr, room, lvl, en, type, tag, symbols[type] || '', sys, '', 'room', hal, ...objCols.map((c) => typeMaps[type][c] || '')];
   const rows = rr.map(({ d, room, en }) => row(d.instance, room, en, d.type, d.tag, d.servedBy, 'HVAC'));
-  if (b.light) {
-    // One lighting row per room, on the first controller serving it. Change the address if lights are on a separate controller.
+  const lc = included(b).filter((d) => isLight(d.type));
+  if (lc.length) {
+    // Lighting controllers from the export: one LIGHT row per room they list.
+    lc.forEach((d) => parseRooms(d.rooms).forEach((r) => {
+      const room = r.number || r.name;
+      rows.push(row(d.instance, room, r.number ? `${r.name} ${r.number}` : r.name, 'LIGHT', d.tag, '', 'LIGHT'));
+    }));
+  } else if (b.light) {
+    // No lighting controllers in the export: fall back to one LIGHT row per room on its first HVAC controller.
     const seen = new Set();
     rr.forEach(({ d, room, en }) => { if (!seen.has(room)) { seen.add(room); rows.push(row(d.instance, room, en, 'LIGHT', `L-${room}`, '', 'LIGHT')); } });
   }
@@ -413,7 +427,7 @@ function buildNavCSV(b, i, tr) {
       if (sec === 'TU') { rows.push(H(sec, 'ROOMS')); rows.push(R(sec, uniq('Room_Summary'), 'Room Summary', 'roomControl', 'roomControlTable')); }
     }
   }
-  if (b.light) {
+  if (lit(b)) {
     // menu LIGHT switches the room control mode; same floor plan files, new page aliases.
     rows.push(H('LIGHT', 'Lighting'));
     if (areas.length) {
@@ -468,7 +482,7 @@ function files() {
   project.buildings.forEach((b, i) => {
     const proj = projName(b, i);
     out.push({ path: `_Proj_Lib/CSV/${proj}.csv`, what: `${bName(b, i)}: navigation`, body: buildNavCSV(b, i, tr) });
-    out.push({ path: `_Proj_Lib/CSV/${proj}_RoomControl.csv`, what: `${bName(b, i)}: rooms${b.light ? ', terminal units and lighting' : ' and terminal units'}`, body: buildRoomCSV(b) });
+    out.push({ path: `_Proj_Lib/CSV/${proj}_RoomControl.csv`, what: `${bName(b, i)}: rooms${lit(b) ? ', terminal units and lighting' : ' and terminal units'}`, body: buildRoomCSV(b) });
   });
   const trCSV = toCSV([['ALIAS', 'en'], ...Object.entries(tr)]);
   return [
@@ -496,9 +510,10 @@ function warnings() {
     const tags = included(b).map((d) => d.tag);
     const dup = tags.filter((t, j) => tags.indexOf(t) !== j);
     if (dup.length) w.push(`${pre}duplicate tags ${[...new Set(dup)].join(', ')}.`);
-    const noRooms = included(b).filter((d) => isRoomType(d.type) && !parseRooms(d.rooms).length);
+    const noRooms = included(b).filter((d) => hasRooms(d.type) && !parseRooms(d.rooms).length);
+    if (b.light && !included(b).some((d) => isLight(d.type))) w.push(`${pre}lighting is on but no lighting controllers are in the export, so lighting rows use each room's VAV controller address. Add the lighting controllers' tag prefix to the tag list (type LIGHT) if they're in the export.`);
     if (noRooms.length) w.push(`${pre}no rooms parsed for ${noRooms.map((d) => d.tag).join(', ')}.`);
-    if (b.light && !areasOf(b).length) w.push(`${pre}lighting is on but there are no floor plan areas, so the Lighting section only has the room summary.`);
+    if (lit(b) && !areasOf(b).length) w.push(`${pre}lighting is on but there are no floor plan areas, so the Lighting section only has the room summary.`);
   });
   const types = [...new Set(allIncluded().filter((d) => isRoomType(d.type)).map((d) => d.type))];
   types.forEach((t) => {
@@ -516,7 +531,7 @@ function renderDerived() {
   rr.forEach((r) => (byRoom[r.room] = (byRoom[r.room] || []).concat(r.d.tag)));
   const shared = Object.entries(byRoom).filter(([, t]) => t.length > 1);
   $('#rm-summary').innerHTML = rr.length
-    ? `<b>${Object.keys(byRoom).length}</b> rooms, <b>${rr.length}</b> HVAC rows${b.light ? ` and <b>${Object.keys(byRoom).length}</b> lighting rows` : ''}.` +
+    ? `<b>${Object.keys(byRoom).length}</b> rooms, <b>${rr.length}</b> HVAC rows${lit(b) ? ' plus lighting rows' : ''}.` +
       (shared.length ? ` Served by more than one unit: ${shared.map(([r, t]) => `${esc(r)} (${t.map(esc).join(', ')})`).join('; ')}.` : '')
     : 'Rooms appear here once equipment is loaded.';
   $('#rm-table').innerHTML = '<thead><tr><th>room</th><th>en</th><th>equipmentTag</th><th>address</th><th>sys (served by)</th></tr></thead><tbody>' +

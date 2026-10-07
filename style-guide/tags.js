@@ -27,6 +27,7 @@ export const TAG_LIST = [
   ['CT', 'PLANT', 'Cooling tower'],
   ['P', 'PLANT', 'Pump'],
   ['HX', 'PLANT', 'Heat exchanger'],
+  ['LC', 'LIGHT', 'Lighting controller (prefix to confirm)'],
 ];
 
 // type -> nav section and flyout heading
@@ -45,6 +46,8 @@ export const TYPES = {
   CUH: { section: 'MISC', heading: 'CABINET HEATERS', label: 'Cabinet Heater' },
   EF: { section: 'MISC', heading: 'EXHAUST FANS', label: 'Exhaust Fan' },
   OTHER: { section: 'MISC', heading: 'OTHER', label: 'Other' },
+  // Lighting controllers get no nav pages of their own; their rooms become LIGHT rows in the room file.
+  LIGHT: { section: 'LIGHTING', heading: 'LIGHTING', label: 'Lighting controller' },
 };
 
 export const SECTIONS = [['AIR', 'Air Systems'], ['PLANT', 'Central Plant'], ['TU', 'Terminal Units'], ['MISC', 'Miscellaneous']];
