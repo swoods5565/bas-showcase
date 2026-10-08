@@ -195,6 +195,7 @@ B_FIELDS.forEach((k) => {
   el.addEventListener('input', () => {
     const b = cur();
     b[k] = readField(el);
+    b.typed = { ...b.typed, [k]: !!b[k] };
     if (k === 'proj') b.projTouched = true;
     if (k === 'bldg' && !b.projTouched) { b.proj = b.bldg.replace(/[^A-Za-z0-9]/g, ''); $('#b-proj').value = b.proj; }
     saveProject();
@@ -243,12 +244,15 @@ function loadCSV(text, label) {
   b.devices = body.filter((r) => r[iName] && r[iDev]).map((r) => parseDevice(r[iName], r[iDev]));
   b.devices.sort((x, y) => Number(x.instance) - Number(y.instance));
   linkServedBy(b.devices);
-  if (iSite >= 0 && body[0]?.[iSite] && !b.site) b.site = body[0][iSite];
+  // Fields filled from the export are refilled on every load; ones the tech typed are kept.
+  const auto = (k, v) => { if (!b.typed?.[k]) b[k] = v ?? ''; };
+  auto('site', iSite >= 0 ? body[0]?.[iSite] : '');
   const inst = b.devices.map((d) => Number(d.instance)).filter((n) => !Number.isNaN(n));
-  if (inst.length && !b.range) b.range = `${Math.floor(Math.min(...inst) / 100) * 100}/${Math.floor(Math.max(...inst) / 100) * 100 + 99}`;
+  auto('range', inst.length ? `${Math.floor(Math.min(...inst) / 100) * 100}/${Math.floor(Math.max(...inst) / 100) * 100 + 99}` : '');
   const air = b.devices.find((d) => TYPES[d.type].section === 'AIR');
-  if (!b.bldg && air?.desc) { b.bldg = air.desc; if (!b.projTouched) b.proj = air.desc.replace(/[^A-Za-z0-9]/g, ''); }
-  if (!b.oadev && air) b.oadev = air.instance;
+  auto('bldg', air?.desc);
+  if (!b.projTouched) b.proj = b.bldg.replace(/[^A-Za-z0-9]/g, '');
+  auto('oadev', air?.instance);
   saveProject();
   fillBuildingForm();
   toast(`Loaded ${b.devices.length} devices from ${label}`);
@@ -264,7 +268,7 @@ $('#paste-btn').addEventListener('click', () => { $('#paste').hidden = false; $(
 $('#paste-use').addEventListener('click', () => loadCSV($('#paste').value, 'pasted text'));
 $('#sample-btn').addEventListener('click', () => fetch('sample-objectlist.csv').then((r) => r.text()).then((t) => {
   const b = cur();
-  Object.assign(b, { bldg: '', proj: '', projTouched: false, site: '', range: '', oadev: '' });
+  Object.assign(b, { bldg: '', proj: '', projTouched: false, site: '', range: '', oadev: '', typed: {} });
   if (!b.areas) b.areas = 'Overall Building\nClassroom Wing\nGym';
   loadCSV(t, 'the sample');
 }).catch(() => toast('Sample needs the page served over http')));
