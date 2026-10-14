@@ -45,3 +45,13 @@ Pan by dragging with the Pan tool (H), the middle mouse button or with Space hel
 - Works best on vector PDFs exported from CAD/Revit and clean scans. Very faint or noisy scans need a manual threshold and more brush work.
 - Text drawn as vector strokes (SHX fonts) is not real PDF text, so it is removed by the thickness filter rather than the text skip; bold text may survive and need the eraser.
 - Curved walls are not paired as double-line walls, and raster door detection assumes horizontal or vertical walls (vector door swings work at any angle).
+
+## Claude version
+
+`claude-page/` holds the claude.ai Artifact version of this tool. It loads the same `app.js`, `engine.js`, `vector.js` and `worker.js`, and adds `claude.js`:
+
+- **Find the plan**: Claude looks at the whole sheet and returns the plan's box, leaving out the title block, key plan, notes and logos. The box edges then move out to the nearest blank paper without crossing the title block border.
+- **Review result**: Claude compares the original with the result (in 2 × 2 tiles on big plans), lists missed walls, doors and windows and things that should not be there, and can suggest setting changes. Each fix is an edit you can undo.
+- **Lessons**: a shared list stored in the Artifact's database. Claude reads it on every request, and can suggest new lessons from a review or from your brush edits.
+
+It is published with `claude-page/page.html` as the page and the other files at the same relative paths (`vendor/` included). It needs the `sample` (with images), `db` and `downloads` capabilities. The GitHub Pages version does not use it.

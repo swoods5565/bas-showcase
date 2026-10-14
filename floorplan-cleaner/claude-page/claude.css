@@ -1,0 +1,43 @@
+/* Claude panel for the claude.ai version of Floor Plan Cleaner. Uses the tokens in style.css. */
+:root { --mark: #ebcb8b; --bad: #bf616a; --good: #a3be8c; }
+.panel { width: 340px; }
+.ai h2 { display: flex; align-items: center; gap: 8px; }
+.ai h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.ai-busy { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 8px; border-radius: 6px; background: var(--raised); color: var(--strong); font-size: 13px; }
+.ai-busy .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite alternate; flex: none; }
+.ai-msg { margin: 0 0 10px; font-size: 13px; color: var(--strong); }
+.ai-msg.err { color: var(--bad); }
+#ai-out:empty { display: none; }
+#ai-out { display: flex; flex-direction: column; gap: 10px; margin: 0 0 12px; }
+.ai-card { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ai-card p { margin: 0; font-size: 13px; color: var(--strong); }
+.ai-card .row { margin: 0; flex-wrap: wrap; }
+.verdict { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--raised); color: var(--strong); }
+.verdict.good { background: var(--good); color: #1f232b; }
+.verdict.needs_work { background: var(--mark); color: #1f232b; }
+.issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.issue { display: grid; grid-template-columns: 24px 1fr; gap: 2px 8px; padding: 6px; border-radius: 6px; cursor: pointer; }
+.issue:hover, .issue.sel { background: var(--raised); }
+.issue.done { opacity: .5; }
+.issue .num { grid-row: span 2; width: 22px; height: 22px; border-radius: 4px; background: var(--mark); color: #1f232b; font-weight: 700; font-size: 12px; display: grid; place-items: center; }
+.issue .what { font-size: 12px; font-weight: 700; color: var(--strong); }
+.issue .note { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.issue .acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.issue .acts .btn { padding: 2px 8px; font-size: 12px; }
+.settings { width: 100%; border-collapse: collapse; font-size: 12px; }
+.settings td { padding: 3px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+.settings td:nth-child(2) { white-space: nowrap; color: var(--strong); font-variant-numeric: tabular-nums; }
+.lessons { margin-top: 4px; }
+.lessons summary { cursor: pointer; padding: 4px 0; color: var(--strong); }
+.lessons ul { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+.lessons li { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; padding: 5px 6px; border-radius: 6px; background: var(--bg); }
+.lessons li span { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--strong); }
+.lessons li button { border: 0; background: none; color: var(--text); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.lessons li button:hover { color: var(--bad); }
+.lessons li.empty { background: none; padding: 0; opacity: .75; }
+textarea { font: inherit; font-size: 13px; width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--raised); color: var(--strong); resize: vertical; margin: 0 0 8px; }
+.suggest { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--strong); }
+.suggest input { margin-top: 2px; }
+.btn:focus-visible, .seg button:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 820px) { .panel { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .ai-busy .dot, #status.busy::before { animation: none; } }
