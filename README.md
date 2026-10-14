@@ -99,6 +99,11 @@ assets/js/charts.js        SVG charts (line/area/stacked, bars, scatter, sparkli
 assets/js/psychchart.js    interactive psychrometric chart
 assets/js/energymodel.js   hourly/daily energy model, benchmarks, change-point regression
 assets/js/pages/*.js       one module per page
+floorplan-cleaner/         standalone tool: floor plan PDF to clean walls/doors/windows PNG or SVG
 ```
+
+## Floor Plan Cleaner
+
+[`floorplan-cleaner/`](floorplan-cleaner/) is a separate in-browser tool that strips an architectural floor plan PDF down to walls, doors and windows and exports a transparent PNG or layered SVG for building graphics. Once deployed it lives at `/floorplan-cleaner/` on the Pages site. See its [README](floorplan-cleaner/README.md).
 
 Meridian Center, its equipment and its data are fictional. The sequences and figures are for demonstration and are not design values.
