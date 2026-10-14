@@ -26,6 +26,7 @@ export const DEVICES = {
   'AHU-1': { inst: 1100, name: 'MT-AHU-1', model: 'Programmable equipment controller', net: 'BACnet/IP · 10.20.1.21:47808' },
   CHW: { inst: 1200, name: 'MT-CHW-PLANT', model: 'Programmable plant controller', net: 'BACnet/IP · 10.20.1.22:47808' },
   HW: { inst: 1300, name: 'MT-HW-PLANT', model: 'Programmable plant controller', net: 'BACnet/IP · 10.20.1.23:47808' },
+  'RTU-1': { inst: 1150, name: 'MT-RTU-1', model: 'Packaged rooftop unit controller', net: 'BACnet/IP · 10.20.1.25:47808' },
   MTR: { inst: 1400, name: 'MT-METERS', model: 'Energy meter gateway (Modbus TCP → BACnet)', net: 'BACnet/IP · 10.20.1.24:47808' },
 };
 ZONES.forEach(z => { DEVICES[z.id] = { inst: z.device, name: 'MT-' + z.id, model: `VAV controller w/ integral actuator · ${z.size}" inlet`, net: `BACnet MS/TP · net ${z.mstp.net} · MAC ${z.mstp.mac} · 76.8 kbps` }; });
@@ -112,6 +113,30 @@ def(A, 'FRZ', 'BI', 'Freezestat (low limit)', '', { states: NORMAL, alarm: { cls
 def(A, 'SMK', 'BI', 'Supply duct smoke detector', '', { states: NORMAL, alarm: { cls: 'life', delay: 0, test: v => v === 1, msg: 'Duct smoke detected — fan shutdown' } });
 def(A, 'CLG-REQ', 'AV', 'Cooling SAT reset requests', '', { dec: 0, cmd: false });
 def(A, 'SP-REQ', 'AV', 'Static pressure reset requests', '', { dec: 0, cmd: false });
+
+// RTU-1 (packaged single-zone rooftop unit: 2-stage DX cooling, 2-stage gas heat, economizer)
+// Serves the Receiving & Loading Dock wing, which is not on the VAV system.
+const R = 'RTU-1';
+def(R, 'SF-SS', 'BO', 'Supply fan start/stop', '', { states: ONOFF, v: 1 });
+def(R, 'SF-STS', 'BI', 'Supply fan status', '', { states: ONOFF });
+def(R, 'SF-SPD', 'AO', 'Supply fan speed (2-speed ECM)', PCT, { dec: 0 });
+def(R, 'OAD', 'AO', 'Outdoor air damper', PCT, { dec: 0 });
+def(R, 'MAT', 'AI', 'Mixed air temperature', F);
+def(R, 'RAT', 'AI', 'Return air temperature', F);
+def(R, 'SAT', 'AI', 'Supply air temperature', F);
+def(R, 'SA-CFM', 'AI', 'Supply airflow (calc)', CFM, { dec: 0 });
+def(R, 'ZN-T', 'AI', 'Receiving & Loading Dock space temperature', F, { alarm: { cls: 'medium', delay: 900, test: (v) => pv('BLDG.OCC-MODE') === 1 && (v > pv('RTU-1.ZN-CSP') + 4 || v < pv('RTU-1.ZN-HSP') - 4), msg: 'Space temperature out of range' } });
+def(R, 'ZN-CSP', 'AV', 'Active cooling setpoint', F, { v: 75 });
+def(R, 'ZN-HSP', 'AV', 'Active heating setpoint', F, { v: 68 });
+def(R, 'CMP-1', 'BO', 'Compressor stage 1', '', { states: ONOFF });
+def(R, 'CMP-2', 'BO', 'Compressor stage 2', '', { states: ONOFF });
+def(R, 'HTG-1', 'BO', 'Gas heat stage 1', '', { states: ONOFF });
+def(R, 'HTG-2', 'BO', 'Gas heat stage 2', '', { states: ONOFF });
+def(R, 'CF-1', 'BO', 'Condenser fan 1', '', { states: ONOFF });
+def(R, 'CF-2', 'BO', 'Condenser fan 2', '', { states: ONOFF });
+def(R, 'ECON-EN', 'BV', 'Economizer enable', '', { states: ENDIS, cmd: false });
+def(R, 'FILT-DP', 'AI', 'Filter differential pressure', INWC, { dec: 2 });
+def(R, 'MODE', 'MSV', 'Unit operating mode', '', { states: [null, 'Off', 'Fan only', 'Economizer', 'Cooling', 'Heating'], cmd: false, v: 1 });
 
 // VAV boxes (G36 §5.6 single-duct VAV with reheat, dual maximum)
 for (const z of ZONES) {
@@ -228,6 +253,7 @@ function occFraction(type, s, key) {
 const Z = sim.zones;
 ZONES.forEach((z, i) => { Z[z.id] = { z, tz: 72 + noise(z.id, 1, 1) * 1.2, cfm: z.cfmMin, dat: 58, co2: 520, occ: 0, load: 0, reheat: 0, people: 0 }; });
 const S = sim.plant = { dsp: 1.0, dspSp: 1.0, satT: 57, sat: 56, mat: 60, rat: 74, wra: .0085, wsa: .0080, wma: .008, spd: 60, oaFrac: .2, ccBtu: 0, phBtu: 0, tr: 0, chwst: 44.5, chwrt: 55, cwst: 78, hwst: 140, hwrt: 120, csup: 600, filt: .62, ch2: false, b2: false, chwEn: false, hwEn: false, oat: 70 };
+const RT = sim.rtu = { tz: 72, sat: 62, mat: 68, c1: 0, c2: 0, h1: 0, h2: 0, tOn: 0 };
 const DESIGN_CFM = BUILDING.designCfm, SF_KW = 42, RF_KW = 14, CH_CAP = 125, B_CAP = 1500000;
 
 function outdoor() {
@@ -355,6 +381,7 @@ export function tick(dt = sim.speed) {
     sumCfm += Math.max(0, cfm); sumVbz += (z.type === 'data' ? 0 : SPACE[z.type].oaRp * ppl + SPACE[z.type].oaRa * z.area);
   }
   logic('AHU-1.CLG-REQ', clgReq); logic('AHU-1.SP-REQ', spReq);
+  rtuTick(dt, s, oat, occMode, ghi);
 
   // ---- Trim & Respond (every 2 min simulated)
   trAcc += dt;
@@ -518,6 +545,56 @@ export function tick(dt = sim.speed) {
   }
   evalAlarms(dt);
   emit('tick', sim);
+}
+
+// --- RTU-1: single-zone packaged unit with staged DX cooling and gas heat ----------------
+const RTU_CFM = 2800, RTU_UA = 380;
+function rtuTick(dt, s, oat, occMode, ghi) {
+  const d = 'RTU-1', step = dt || 1;
+  logic(d + '.ZN-CSP', occMode ? 75 : 85); logic(d + '.ZN-HSP', occMode ? 68 : 58);
+  const csp = pv(d + '.ZN-CSP'), hsp = pv(d + '.ZN-HSP'), tz = RT.tz;
+  // Unoccupied: the fan cycles on with a stage call only
+  const call = tz > csp + .5 || tz < hsp - .5 || RT.c1 || RT.h1;
+  logic(d + '.SF-SS', occMode || call ? 1 : 0);
+  const fan = pv(d + '.SF-SS') === 1; logic(d + '.SF-STS', fan ? 1 : 0);
+  // Staging with hysteresis and a 3-minute minimum run time (anti short-cycle)
+  RT.tOn += step;
+  const stage = (k, on, off) => { if (!RT[k] && on) { RT[k] = 1; RT.tOn = 0; } else if (RT[k] && off && RT.tOn > 180) RT[k] = 0; };
+  const econ = fan && oat < 65 && oat < RT.tz - 2;
+  logic(d + '.ECON-EN', econ ? 1 : 0);
+  const cErr = tz - csp, hErr = hsp - tz;
+  const freeCool = econ && oat < 55; // the economizer carries the load: compressors locked out
+  if (!fan) { RT.c1 = RT.c2 = RT.h1 = RT.h2 = 0; }
+  else {
+    stage('c1', !freeCool && cErr > .5 && !RT.h1, cErr < -.6 || freeCool); stage('c2', RT.c1 && cErr > 1.6, cErr < .4);
+    stage('h1', hErr > .5 && !RT.c1, hErr < -.6); stage('h2', RT.h1 && hErr > 1.6, hErr < .4);
+    if (!RT.c1) RT.c2 = 0; if (!RT.h1) RT.h2 = 0;
+  }
+  logic(d + '.CMP-1', RT.c1); logic(d + '.CMP-2', RT.c2); logic(d + '.HTG-1', RT.h1); logic(d + '.HTG-2', RT.h2);
+  logic(d + '.CF-1', RT.c1); logic(d + '.CF-2', RT.c2 || (RT.c1 && oat > 85) ? 1 : 0);
+  const spd = !fan ? 0 : RT.c2 || RT.h2 ? 100 : 70;
+  logic(d + '.SF-SPD', spd);
+  const cfm = RTU_CFM * spd / 100;
+  // Economizer: modulate OA to hold a 55 °F mixed-air target, 20 % minimum when occupied
+  const rat = tz + .8, minOa = occMode && fan ? 20 : 0;
+  let oad = minOa;
+  if (econ && cErr > -1) oad = Math.abs(oat - rat) > .5 ? clamp((55 - rat) / (oat - rat) * 100, minOa, 100) : 100;
+  logic(d + '.OAD', fan ? oad : 0);
+  const f = pv(d + '.OAD') / 100;
+  RT.mat = lag(RT.mat, fan ? f * oat + (1 - f) * rat : rat, step, 25);
+  const satT = !fan ? RT.mat : RT.mat - (RT.c1 ? 14 : 0) - (RT.c2 ? 8 : 0) + (RT.h1 ? 32 : 0) + (RT.h2 ? 24 : 0) + .6;
+  RT.sat = lag(RT.sat, satT, step, 40);
+  // Zone: internal + solar + envelope, approached through thermal mass
+  const people = s.occ ? 6 : 0, internal = people * 450 + (s.occ ? 2400 * 1.1 * 3.412 : 1500);
+  const load = internal + 2400 * .06 * (ghi / 900) * 12;
+  const ma = fan ? 1.08 * cfm : 0;
+  const tT = clamp((ma * RT.sat + load + RTU_UA * oat) / (ma + RTU_UA), 45, 95);
+  RT.tz = lag(RT.tz, tT, step, fan ? 700 : 2400);
+  logic(d + '.ZN-T', RT.tz + noise('rtuz', sim.t.getTime() / 9e4, 1) * .12);
+  logic(d + '.RAT', rat); logic(d + '.MAT', RT.mat); logic(d + '.SAT', RT.sat + noise('rtus', sim.t.getTime() / 6e3, 1) * .15);
+  logic(d + '.SA-CFM', fan ? cfm + noise('rtuf', sim.t.getTime() / 4e3, 1) * 15 : 0);
+  logic(d + '.FILT-DP', fan ? .38 * (spd / 100) ** 2 : 0);
+  logic(d + '.MODE', !fan ? 1 : RT.h1 ? 5 : RT.c1 ? 4 : econ && oad > minOa + 1 ? 3 : 2);
 }
 
 // --- Alarm engine (BACnet intrinsic-reporting style) ---------------------------------

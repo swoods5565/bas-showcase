@@ -532,3 +532,40 @@ dialog.palette::backdrop { background:rgba(15,18,24,.45); backdrop-filter:blur(4
   .bg-aurora { animation:none; }
 }
 @media (forced-colors: active) { .card, .btn, .seg { border:1px solid CanvasText; } }
+
+/* ----- Vector-library style equipment canvas (pages/qa-*.js) ---------------- */
+.qa-wrap { position:relative; border-radius:var(--radius); overflow:hidden; }
+.qa-wrap[data-panel="light"] {
+  background: linear-gradient(rgba(30,40,55,.05) 1px, transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg, rgba(30,40,55,.05) 1px, transparent 1px) 0 0/40px 40px, linear-gradient(#f4f6f8, #dce0e5);
+  --text:#1b212c; --text-2:#283040; --muted:#4f5868; --panel-solid:#ffffff; --panel:#ffffff;
+  --line:rgba(30,40,55,.10); --line-2:rgba(30,40,55,.30); --accent:#2a6fb8;
+  --qa-tag:#1b212c; --qa-halo:#f4f6f8;
+}
+.qa-wrap[data-panel="dark"] {
+  background: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0/40px 40px, linear-gradient(#2a2f37, #1b1e24);
+  --text:#eef1f4; --text-2:#d6dbe2; --muted:#a2abb9; --panel-solid:#16191e; --panel:#16191e;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.24);
+  --qa-tag:#ffffff; --qa-halo:#1b1e24;
+}
+.qa-tools { display:flex; justify-content:flex-end; gap:10px; align-items:center; padding:10px 12px 0; }
+.qa-tools .seg { background:var(--panel-solid); border-color:var(--line-2); }
+.qa-tools .seg button { color:var(--muted); }
+.qa-tools .seg button.on { color:var(--text); background:color-mix(in srgb, var(--accent) 18%, var(--panel-solid)); }
+.qa-note { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.gfx .qa-tag { font-size:21px; font-weight:800; fill:var(--qa-tag); paint-order:stroke; stroke:var(--qa-halo); stroke-width:5px; stroke-linejoin:round; letter-spacing:.04em; }
+.gfx .qa-lbl { font-size:19px; font-weight:700; fill:#ffffff; letter-spacing:.07em; text-transform:uppercase; paint-order:stroke; stroke:rgba(0,0,0,.35); stroke-width:3px; }
+.gfx .qa-air { stroke:#ffffff; opacity:.6; stroke-width:5; }
+.gfx .qa-air.stopped { opacity:.12; }
+.gfx .qa-glow { transition:opacity .9s ease; }
+.gfx .qa-pulse { animation:qaPulse 1.8s ease-in-out infinite; }
+@keyframes qaPulse { 50% { filter:brightness(1.45) saturate(1.2); } }
+.gfx .qa-blade { transform-box:fill-box; transform-origin:center; transition:transform 1.2s cubic-bezier(.3,.7,.2,1); }
+.gfx .qa-core { stroke:rgba(255,255,255,.65) !important; stroke-width:4; }
+.gfx .qa-banner { fill:var(--panel-solid); stroke:var(--line-2); }
+.gfx .qa-banner-t { font-size:21px; font-weight:600; fill:var(--text-2); }
+.qa-wrap .gfx text.t-sm { fill:var(--muted); }
+.gfx .qa-rdamp { transform-box:fill-box; transform-origin:center; transition:transform 1.2s cubic-bezier(.3,.7,.2,1); }
+.gfx .qa-room { fill:rgba(255,255,255,.45); }
+.qa-wrap[data-panel="dark"] .gfx .qa-room { fill:rgba(255,255,255,.05); }

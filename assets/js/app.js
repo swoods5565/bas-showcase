@@ -16,11 +16,12 @@ if (store('hmi') === 'hp') root.dataset.hmi = 'hp';
 export const ROUTES = [
   { path: '', title: 'Overview', icon: 'home', mod: 'home', sec: 'Site' },
   { path: 'building', title: 'Building 3D', icon: 'cube', mod: 'building', sec: 'Site' },
-  { path: 'ahu', title: 'AHU-1', icon: 'fan', mod: 'ahu', sec: 'Air Side' },
+  { path: 'ahu', title: 'AHU-1', icon: 'fan', mod: 'ahu', sec: 'Air Side', lib: true },
+  { path: 'rtu', title: 'RTU-1', icon: 'fan', mod: 'rtu', sec: 'Air Side', lib: true },
   { path: 'vavs', title: 'VAV Summary', icon: 'grid', mod: 'vavs', sec: 'Air Side' },
-  { path: 'vav', title: 'VAV Boxes', icon: 'box', mod: 'vav', sec: 'Air Side', hidden: true },
-  { path: 'chw', title: 'Chilled Water Plant', icon: 'snow', mod: 'chw', sec: 'Water Side' },
-  { path: 'hw', title: 'Heating Hot Water', icon: 'flame', mod: 'hw', sec: 'Water Side' },
+  { path: 'vav', title: 'VAV Boxes', icon: 'box', mod: 'vav', sec: 'Air Side', hidden: true, lib: true },
+  { path: 'chw', title: 'Chilled Water Plant', icon: 'snow', mod: 'chw', sec: 'Water Side', lib: true },
+  { path: 'hw', title: 'Heating Hot Water', icon: 'flame', mod: 'hw', sec: 'Water Side', lib: true },
   { path: 'energy', title: 'Energy & Utilities', icon: 'bolt', mod: 'energy', sec: 'Dashboards' },
   { path: 'weather', title: 'Outdoor Conditions', icon: 'sun', mod: 'weather', sec: 'Dashboards' },
   { path: 'alarms', title: 'Alarms & Events', icon: 'bell', mod: 'alarms', sec: 'Dashboards' },
@@ -89,16 +90,26 @@ function markActive(path) {
 }
 
 // ---------- Router -----------------------------------------------------------------
+// Pages flagged `lib` have a second graphic style drawn from vector-library-style symbols
+// (pages/qa-*.js). The choice is remembered per browser.
+const libStyle = () => store('gstyle') === 'lib';
+function styleSwitch(view) {
+  const head = $('.head-actions', view); if (!head) return;
+  const seg = h('div.seg', { role: 'group', 'aria-label': 'Graphic style', title: 'Switch between the standard graphics and the vector-library style' });
+  [['std', 'Standard'], ['lib', 'Library']].forEach(([k, t]) => seg.append(h('button' + ((k === 'lib') === libStyle() ? '.on' : ''), { onclick: () => { if ((k === 'lib') !== libStyle()) { store('gstyle', k); route(); } } }, t)));
+  head.prepend(seg);
+}
 let current = null;
 async function route() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [base, ...rest] = raw.split('/');
   const r = ROUTES.find(x => x.path === base) || ROUTES[0];
-  const mod = await import(`./pages/${r.mod}.js`);
+  const mod = await import(`./pages/${r.lib && libStyle() ? 'qa-' + r.mod : r.mod}.js`);
   const render = () => {
     current?.destroy?.();
     const view = $('#view'); view.innerHTML = '';
     current = mod.default.mount(view, rest.join('/')) || {};
+    if (r.lib) styleSwitch(view);
     bindScan(); applyBindings();
     document.title = (mod.default.title?.(rest.join('/')) || r.title) + ' · Meridian BAS';
     $('#main').scrollTo({ top: 0 });
@@ -243,7 +254,7 @@ async function boot() {
     ['Binding BACnet/IP port <span class="hl">47808 (0xBAC0)</span> on 10.20.1.10', 8],
     ['Broadcasting <span class="hl">Who-Is</span> … received I-Am from 45 devices', 20],
     ['Reading object lists (ReadPropertyMultiple) …', 34],
-    [`Loaded <span class="hl">${pts.size.toLocaleString()}</span> objects · ${ZONES.length} VAV · 1 AHU · 2 plants · 1 meter gateway`, 48],
+    [`Loaded <span class="hl">${pts.size.toLocaleString()}</span> objects · ${ZONES.length} VAV · 1 AHU · 1 RTU · 2 plants · 1 meter gateway`, 48],
     ['Subscribing COV · Notification classes 1–5', 60],
     ['Fetching live outdoor conditions (Open-Meteo, NOAA/NWS) …', 72],
   ];
