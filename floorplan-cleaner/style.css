@@ -9,6 +9,14 @@
   --line: #d8dee9; --text: #5e6a80; --strong: #2e3440; --check-a: #ffffff; --check-b: #e5e9f0;
   color-scheme: light;
 }
+/* With no explicit theme set, follow the system setting. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --accent: #3f7f95; --bg: #e5e9f0; --panel: #fafbfc; --raised: #eceff4; --hover: #d8dee9;
+    --line: #d8dee9; --text: #5e6a80; --strong: #2e3440; --check-a: #ffffff; --check-b: #e5e9f0;
+    color-scheme: light;
+  }
+}
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }

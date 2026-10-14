@@ -1,0 +1,179 @@
+<title>Floor Plan Cleaner</title>
+<meta name="description" content="Turn an architectural floor plan PDF into a clean, transparent walls, doors and windows image for building automation graphics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="claude.css">
+<script src="vendor/pdf.min.js"></script>
+<script src="vector.js"></script>
+<script src="app.js" defer></script>
+<script src="claude.js" defer></script>
+<header class="topbar">
+    <b class="title">Floor Plan Cleaner</b>
+    <span class="muted small hide-sm">PDF floor plan in, clean walls, doors and windows out, checked by Claude</span>
+    <span class="spacer"></span>
+    <label class="btn primary" for="file">Open PDF or image</label>
+    <input id="file" type="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp" hidden>
+  </header>
+
+  <main class="layout">
+    <aside class="panel" id="panel">
+      <section class="ai" id="ai">
+        <h2>Claude</h2>
+        <p class="hint" id="ai-off" hidden>Claude features work when this page is open in Claude. The cleaner and brushes still work here.</p>
+        <div id="ai-on">
+          <div class="row">
+            <button class="btn primary grow" id="ai-crop" disabled title="Claude finds the floor plan on the sheet and crops out the title block, key plan and notes">Find the plan</button>
+            <button class="btn grow" id="ai-review" disabled title="Claude compares the result with the original and points out what was missed">Review result</button>
+          </div>
+          <label class="check"><input type="checkbox" id="ai-autocrop" checked> Find the plan when I open a file</label>
+          <div class="row" id="ai-learn-row" hidden>
+            <button class="btn sm grow" id="ai-learn" title="Claude looks at what you erased or brought back and suggests lessons for next time">Learn from my edits</button>
+          </div>
+          <div class="ai-busy" id="ai-busy" hidden><span class="dot"></span><span id="ai-busy-text">Thinking…</span><span class="spacer"></span><button class="btn sm" id="ai-stop">Stop</button></div>
+          <p class="ai-msg" id="ai-msg" hidden></p>
+          <div id="ai-out"></div>
+          <details class="lessons" id="ai-lessons">
+            <summary><b>Lessons</b> <span class="muted small" id="ai-lcount">loading…</span></summary>
+            <p class="hint">Shared with everyone who uses this page. Claude reads them every time it finds a plan or reviews a result.</p>
+            <ul id="ai-llist"></ul>
+            <label class="field" for="ai-lnew"><span>Teach Claude something</span></label>
+            <textarea id="ai-lnew" rows="2" placeholder="Example: Logos and stamps in the title block are never part of the plan."></textarea>
+            <div class="row">
+              <button class="btn sm" id="ai-ladd" disabled>Save lesson</button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section>
+        <h2>1 · Source</h2>
+        <div class="field" id="page-field" hidden>
+          <span>Page</span>
+          <div class="row">
+            <button class="btn sm" id="page-prev" aria-label="Previous page">‹</button>
+            <input type="number" id="page" min="1" value="1">
+            <span class="muted small" id="page-count"></span>
+            <button class="btn sm" id="page-next" aria-label="Next page">›</button>
+          </div>
+        </div>
+        <label class="field">
+          <span>Working resolution <output id="res-out"></output></span>
+          <select id="res">
+            <option value="2000">2000 px (fast)</option>
+            <option value="3000">3000 px</option>
+            <option value="4000" selected>4000 px</option>
+            <option value="6000">6000 px (detailed, slow)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="no-text" checked> Remove PDF text before cleaning</label>
+        <p class="hint">Use the crop tool to box in just the floor plan, leaving out the title block and notes.</p>
+      </section>
+
+      <section>
+        <h2>2 · Detection</h2>
+        <label class="field">
+          <span>Ink darkness <output id="threshold-out"></output></span>
+          <input type="range" id="threshold" min="40" max="240" value="150">
+          <small>Lower ignores gray furniture and screened backgrounds.</small>
+        </label>
+        <label class="field">
+          <span>Wall thickness, min <output id="minWall-out"></output></span>
+          <div class="row"><input type="range" id="minWall" min="2" max="40" value="6"><button class="btn sm" id="auto-wall" title="Estimate from the drawing">Auto</button></div>
+          <small>Strokes thinner than this are not walls.</small>
+        </label>
+        <label class="check" id="useVec-row"><input type="checkbox" id="useVec" checked> Read wall lines from the PDF</label>
+        <label class="field" id="lineMax-row">
+          <span>Double-line wall, widest <output id="lineMax-out"></output></span>
+          <input type="range" id="lineMax" min="4" max="80" value="30">
+          <small>For CAD drawings with walls drawn as two thin lines. Set it a little wider than the thickest wall.</small>
+        </label>
+        <label class="field">
+          <span>Join double-line walls (scans) <output id="joinGap-out"></output></span>
+          <input type="range" id="joinGap" min="0" max="30" value="0">
+          <small>For scanned plans with walls drawn as two thin lines. Fills the space between them.</small>
+        </label>
+        <label class="field">
+          <span>Smallest wall piece <output id="minWallArea-out"></output></span>
+          <input type="range" id="minWallArea" min="0" max="5000" step="10" value="400">
+          <small>Drops bold symbols, arrows and specks.</small>
+        </label>
+        <label class="check"><input type="checkbox" id="dropFrame" checked> Remove sheet border</label>
+        <label class="check"><input type="checkbox" id="keepOpenings" checked> Keep doors and windows</label>
+        <label class="field">
+          <span>Widest door / window <output id="maxOpening-out"></output></span>
+          <input type="range" id="maxOpening" min="10" max="800" value="300">
+          <small>Bigger gaps in walls are not treated as openings.</small>
+        </label>
+      </section>
+
+      <section>
+        <h2>3 · Export</h2>
+        <div class="row presets">
+          <button class="btn sm" data-preset="dark">For dark theme</button>
+          <button class="btn sm" data-preset="light">For light theme</button>
+        </div>
+        <div class="row colors">
+          <label class="swatch"><input type="color" id="wallColor" value="#d8dee9"> Walls</label>
+          <label class="swatch"><input type="color" id="openColor" value="#88c0d0"> Doors / windows</label>
+        </div>
+        <label class="field">
+          <span>Canvas</span>
+          <select id="fit">
+            <option value="trim">Trim to the plan</option>
+            <option value="1920x1080" selected>Fit in 1920 × 1080 (enteliWEB)</option>
+            <option value="custom">Fit in custom size</option>
+          </select>
+        </label>
+        <div class="row" id="custom-size" hidden>
+          <input type="number" id="fitW" value="1920" min="100" max="10000" aria-label="Width"> ×
+          <input type="number" id="fitH" value="1080" min="100" max="10000" aria-label="Height">
+        </div>
+        <label class="field">
+          <span>Margin <output id="pad-out"></output></span>
+          <input type="range" id="pad" min="0" max="200" value="40">
+        </label>
+        <div class="row">
+          <button class="btn primary grow" id="dl-png" disabled>Download PNG</button>
+          <button class="btn grow" id="dl-svg" disabled>Download SVG</button>
+        </div>
+        <p class="hint">Both files have a transparent background. The SVG keeps walls and doors/windows as separate layers.</p>
+      </section>
+    </aside>
+
+    <section class="stage">
+      <div class="toolbar">
+        <div class="seg" id="views">
+          <button data-view="overlay" aria-pressed="true" title="Result over the faded original">Overlay</button>
+          <button data-view="result" title="Transparent result only">Result</button>
+          <button data-view="original" title="The page as rendered">Original</button>
+        </div>
+        <div class="seg" id="tools">
+          <button data-tool="pan" aria-pressed="true" title="Pan (H). Scroll to zoom.">✋ Pan</button>
+          <button data-tool="crop" title="Crop to the plan (C)">⬚ Crop</button>
+          <button data-tool="erase" title="Erase anything (E)">⌫ Erase</button>
+          <button data-tool="wall" title="Paint over lost walls to bring them back (W)">▮ Wall</button>
+          <button data-tool="door" title="Paint over lost doors or windows to bring them back (D)">◠ Door/Win</button>
+        </div>
+        <label class="brush small">Brush <input type="range" id="brush" min="4" max="120" value="24"></label>
+        <span class="spacer"></span>
+        <button class="btn sm" id="undo" title="Undo last brush stroke (Ctrl+Z)">Undo</button>
+        <button class="btn sm" id="clear-edits" title="Remove all brush edits">Clear edits</button>
+        <button class="btn sm" id="clear-crop" title="Remove the crop">Uncrop</button>
+        <button class="btn sm" id="fitview" title="Fit to window (F)">Fit</button>
+      </div>
+      <div class="viewport" id="viewport">
+        <canvas id="canvas" width="1" height="1"></canvas>
+        <div class="brush-cursor" id="brush-cursor" hidden></div>
+        <div class="empty" id="empty">
+          <div class="drop">
+            <b>Drop a floor plan PDF here</b>
+            <span class="muted">or use “Open PDF or image”. Everything runs in your browser; files are never uploaded.</span>
+            <button class="btn sm" id="sample">Try a sample plan</button>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar"><span id="status">No file loaded</span><span class="spacer"></span><span id="dims" class="muted"></span></div>
+    </section>
+  </main>

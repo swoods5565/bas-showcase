@@ -313,9 +313,14 @@
     if (p.segs && p.segs.length && p.lineMax > 0) {
       tick('Pairing double-line walls');
       const minT = Math.max(2, p.lineMin || 3);
-      const pw = pairWalls(p.segs, w, h, minT, p.lineMax, p.crop);
+      const pw = pairWalls(p.segs, w, h, minT, p.lineMax, p.crop, p.text);
       const pair = pw.mask;
       windowStrips = pw.windows;
+      // When the drawing has real double-line walls, thick strokes are
+      // symbols, match lines and tags rather than walls.
+      let paired = 0;
+      for (let k = 0; k < pw.stats.length; k++) paired += pw.stats[k];
+      if (paired > 4 * Math.max(w, h)) walls.fill(0);
       // Take in the drawn face lines too, then fill corners and end caps.
       const near = dilate(pair, w, h, 1);
       let lw = new Uint8Array(w * h);
@@ -465,8 +470,108 @@
    * just outside it at the same spacing is a repeating pattern (stair
    * treads, hatching), not a wall.
    */
-  function pairWalls(segs, w, h, minT, maxT, crop) {
+  /* Join collinear pieces that touch end to end. CAD exports often break a
+   * line into many short pieces, which hides what the line really is. */
+  function mergeCollinear(segs, gap) {
+    const groups = new Map();
+    for (let i = 0; i < segs.length; i += 4) {
+      const x1 = segs[i], y1 = segs[i + 1], x2 = segs[i + 2], y2 = segs[i + 3];
+      let a = Math.atan2(y2 - y1, x2 - x1);
+      if (a < 0) a += Math.PI;
+      if (a >= Math.PI - 1e-9) a -= Math.PI;
+      const ux = Math.cos(a), uy = Math.sin(a);
+      const o = -x1 * uy + y1 * ux;
+      const key = Math.round(a * 180 / Math.PI * 4) + ':' + Math.round(o * 2);
+      const t1 = x1 * ux + y1 * uy, t2 = x2 * ux + y2 * uy;
+      const item = { a, o, t0: Math.min(t1, t2), t1: Math.max(t1, t2) };
+      const l = groups.get(key);
+      if (l) l.push(item); else groups.set(key, [item]);
+    }
+    const out = [];
+    for (const l of groups.values()) {
+      l.sort((p, q) => p.t0 - q.t0);
+      let cur = null;
+      const flush = () => {
+        const ux = Math.cos(cur.a), uy = Math.sin(cur.a);
+        out.push(cur.t0 * ux - cur.o * uy, cur.t0 * uy + cur.o * ux, cur.t1 * ux - cur.o * uy, cur.t1 * uy + cur.o * ux);
+      };
+      for (const it of l) {
+        if (cur && it.t0 <= cur.t1 + gap) cur.t1 = Math.max(cur.t1, it.t1);
+        else { if (cur) flush(); cur = Object.assign({}, it); }
+      }
+      if (cur) flush();
+    }
+    return new Float32Array(out);
+  }
+
+  function pairWalls(segs, w, h, minT, maxT, crop, text) {
+    // Short diagonal strokes are dimension ticks. Index them before the
+    // pieces are merged.
+    const CELL = 64, gw = Math.ceil(w / CELL) + 1;
+    const tickGrid = new Map();
+    for (let i = 0; i < segs.length; i += 4) {
+      const L = Math.hypot(segs[i + 2] - segs[i], segs[i + 3] - segs[i + 1]);
+      if (L < 3 || L > 4 * maxT) continue;
+      const k = Math.floor((segs[i + 1] + segs[i + 3]) / 2 / CELL) * gw + Math.floor((segs[i] + segs[i + 2]) / 2 / CELL);
+      const l = tickGrid.get(k);
+      if (l) l.push(i); else tickGrid.set(k, [i]);
+    }
+    const orig = segs;
+    // Is the line at offset o, from s0 to s1 along (ux, uy), crossed by a
+    // short stroke at 30 to 60 degrees? Walls never are; dimension lines are.
+    const ticked = (ux, uy, nx, ny, o, s0, s1) => {
+      const xa = s0 * ux + o * nx, ya = s0 * uy + o * ny, xb = s1 * ux + o * nx, yb = s1 * uy + o * ny;
+      const cx0 = Math.floor((Math.min(xa, xb) - 2 * maxT) / CELL), cx1 = Math.floor((Math.max(xa, xb) + 2 * maxT) / CELL);
+      const cy0 = Math.floor((Math.min(ya, yb) - 2 * maxT) / CELL), cy1 = Math.floor((Math.max(ya, yb) + 2 * maxT) / CELL);
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const l = tickGrid.get(cy * gw + cx);
+          if (!l) continue;
+          for (const i of l) {
+            const x1 = orig[i], y1 = orig[i + 1], x2 = orig[i + 2], y2 = orig[i + 3];
+            const L = Math.hypot(x2 - x1, y2 - y1);
+            const sin = Math.abs(((x2 - x1) * uy - (y2 - y1) * ux) / L);
+            if (sin < 0.5 || sin > 0.87) continue;
+            const d1 = x1 * nx + y1 * ny - o, d2 = x2 * nx + y2 * ny - o;
+            if (d1 * d2 > 0) continue;
+            const t = d1 / (d1 - d2);
+            const s = (x1 + (x2 - x1) * t) * ux + (y1 + (y2 - y1) * t) * uy;
+            if (s > s0 - 1 && s < s1 + 1) return true;
+          }
+        }
+      }
+      return false;
+    };
+    segs = mergeCollinear(segs, 1);
     const mask = new Uint8Array(w * h);
+    // Text centres on a coarse grid, to reject "walls" with writing inside.
+    const textGrid = new Map();
+    if (text) {
+      for (let t = 0; t < text.length; t += 3) {
+        const k = Math.floor(text[t + 1] / CELL) * gw + Math.floor(text[t] / CELL);
+        const l = textGrid.get(k);
+        if (l) l.push(t); else textGrid.set(k, [t]);
+      }
+    }
+    const textInside = (ux, uy, nx, ny, o0, o1, s0, s1) => {
+      if (!textGrid.size) return false;
+      const xs = [s0 * ux + o0 * nx, s1 * ux + o0 * nx, s0 * ux + o1 * nx, s1 * ux + o1 * nx];
+      const ys = [s0 * uy + o0 * ny, s1 * uy + o0 * ny, s0 * uy + o1 * ny, s1 * uy + o1 * ny];
+      const cx0 = Math.floor(Math.min(...xs) / CELL), cx1 = Math.floor(Math.max(...xs) / CELL);
+      const cy0 = Math.floor(Math.min(...ys) / CELL), cy1 = Math.floor(Math.max(...ys) / CELL);
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const l = textGrid.get(cy * gw + cx);
+          if (!l) continue;
+          for (const t of l) {
+            const tx = text[t], ty = text[t + 1];
+            const o = tx * nx + ty * ny, s = tx * ux + ty * uy;
+            if (o > o0 && o < o1 && s > s0 && s < s1) return true;
+          }
+        }
+      }
+      return false;
+    };
     const windows = new Uint8Array(w * h);
     const n = segs.length / 4;
     const BUCKETS = 180;
@@ -516,9 +621,12 @@
           // between them along part of the run are a window drawn in the
           // wall; lines between them all along are something else (a door
           // leaf lying beside a wall, for example).
+          // Lines hugging a face are part of it (Revit draws wall layers,
+          // such as a finish over the stud, as extra lines just inside).
+          const face = Math.min(1.5, Math.max(1, 0.2 * sep));
           const inner = [];
           for (let k = i + 1; k < j; k++) {
-            if (g[k].o - A.o > 0.5 && B.o - g[k].o > 0.5 && overlapLen(g[k], a0, a1) > 0) {
+            if (g[k].o - A.o > face && B.o - g[k].o > face && overlapLen(g[k], a0, a1) > 0) {
               inner.push([Math.max(g[k].t0, a0), Math.min(g[k].t1, a1)]);
             }
           }
@@ -531,24 +639,34 @@
           }
           let covered = 0;
           for (const iv of glass) covered += iv[1] - iv[0];
-          if (covered > 0.98 * len) continue;
+          // Lines between the faces all along: glazing (curtain wall,
+          // storefront) or a door leaf lying in its frame. Either way an
+          // opening, not a wall.
+          const allGlass = covered > 0.98 * len;
+          if (allGlass && len < Math.max(20, 3 * sep)) continue;
           // Repeating pattern check, just outside either line.
           let repeated = false;
           const win = sep * 1.2;
           for (let k = i - 1; k >= 0 && A.o - g[k].o <= win; k--) {
-            if (A.o - g[k].o > 0.5 && overlapLen(g[k], a0, a1) > 0.5 * len) { repeated = true; break; }
+            if (A.o - g[k].o > face && overlapLen(g[k], a0, a1) > 0.5 * len) { repeated = true; break; }
           }
           for (let k = j + 1; !repeated && k < g.length && g[k].o - B.o <= win; k++) {
-            if (g[k].o - B.o > 0.5 && overlapLen(g[k], a0, a1) > 0.5 * len) repeated = true;
+            if (g[k].o - B.o > face && overlapLen(g[k], a0, a1) > 0.5 * len) repeated = true;
           }
-          if (repeated) continue;
-          stats[Math.round(sep)] += len;
+          if (repeated && !allGlass) continue;
+          if (textInside(ux, uy, nx, ny, A.o, B.o, a0, a1)) continue;
+          // A line carrying ticks anywhere along it is a dimension line.
+          if (A.tick === undefined) A.tick = ticked(ux, uy, nx, ny, A.o, A.t0, A.t1);
+          if (B.tick === undefined) B.tick = ticked(ux, uy, nx, ny, B.o, B.t0, B.t1);
+          if (A.tick || B.tick) continue;
+          if (!allGlass) stats[Math.round(sep)] += len;
           const strip = (target, s0, s1) => fillConvex(target, w, h, [
             s0 * ux + A.o * nx, s0 * uy + A.o * ny,
             s1 * ux + A.o * nx, s1 * uy + A.o * ny,
             s1 * ux + B.o * nx, s1 * uy + B.o * ny,
             s0 * ux + B.o * nx, s0 * uy + B.o * ny,
           ]);
+          if (allGlass) { strip(windows, a0, a1); continue; }
           let at = a0;
           for (const iv of glass) {
             if (iv[0] > at) strip(mask, at, iv[0]);
@@ -561,6 +679,25 @@
     }
     for (let i = 0; i < mask.length; i++) if (mask[i]) windows[i] = 0;
     return { mask, windows, stats };
+  }
+
+  /* Widest double-line wall to look for. Pair separations weighted by
+   * length peak at the common partition thickness; exterior walls are up to
+   * about three and a half times that. Dimension strings and other parallel
+   * annotation lie further apart, so this keeps them out. */
+  function suggestLineMax(segs, w, h, minT, text) {
+    const cap = Math.round(Math.max(w, h) / 130);
+    if (!segs || segs.length < 8) return cap;
+    const { stats } = pairWalls(segs, w, h, minT, cap, null, text);
+    const sm = [];
+    for (let i = 0; i < stats.length; i++) sm[i] = (stats[i - 1] || 0) + 2 * stats[i] + (stats[i + 1] || 0);
+    const best = Math.max(...sm);
+    if (!(best > 0)) return cap;
+    let peak = 0;
+    for (let i = Math.ceil(minT); i < sm.length; i++) {
+      if (sm[i] >= 0.4 * best && sm[i] >= (sm[i + 1] || 0)) { peak = i; break; }
+    }
+    return Math.max(6, Math.min(cap, Math.round(3.5 * peak)));
   }
 
   /* Door swings from vector arcs. The arc's centre is the hinge; the arc
@@ -778,7 +915,7 @@
   const api = {
     distInside, distOutside, dilate, erode, fillGaps, components, toInk, runLengths, maxFilter,
     estimateWallThickness, processPlan, traceMask, simplifyClosed, loopsToPath,
-    fillConvex, pairWalls, doorSlots, fillPockets, components4,
+    fillConvex, mergeCollinear, pairWalls, suggestLineMax, doorSlots, fillPockets, components4,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.FPEngine = api;

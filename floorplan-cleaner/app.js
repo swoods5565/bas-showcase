@@ -14,7 +14,14 @@
     crop: null, strokes: [], edit: null,
     view: 'overlay', tool: 'pan', zoom: 1, panX: 0, panY: 0,
     jobId: 0, theme: 'dark', userTouched: {},
+    marks: [], markSel: -1,                      // highlighted boxes drawn over the plan
   };
+  const root = document.documentElement;
+  const themeNow = () => root.dataset.theme ||
+    (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  S.theme = themeNow();
+  const listeners = {};
+  function emit(ev, data) { (listeners[ev] || []).forEach((fn) => { try { fn(data); } catch (e) { console.error(e); } }); }
 
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
@@ -65,7 +72,8 @@
       crop: S.crop,
       segs: useVec ? S.vec.segs : null,
       arcs: useVec ? S.vec.arcs : null,
-      lineMin: Math.max(3, Math.round(Math.max(S.w, S.h) / 800)),
+      text: useVec ? S.vec.text : null,
+      lineMin: Math.max(1.5, Math.max(S.w, S.h) / 1600),
       lineMax: +$('lineMax').value,
     };
   }
@@ -96,17 +104,24 @@
     $('openColor').value = dark ? '#88c0d0' : '#3f7f95';
     paintLayer(); redraw();
   }));
-  $('theme').addEventListener('click', () => {
-    S.theme = S.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = S.theme;
-    $('theme').textContent = S.theme === 'dark' ? 'Light' : 'Dark';
-    redraw();
-    try { localStorage.setItem('fpc-theme', S.theme); } catch (e) { /* storage blocked */ }
-  });
-  try {
-    const t = localStorage.getItem('fpc-theme');
-    if (t) { S.theme = t; document.documentElement.dataset.theme = t; $('theme').textContent = t === 'dark' ? 'Light' : 'Dark'; }
-  } catch (e) { /* storage blocked */ }
+  if ($('theme')) {
+    $('theme').addEventListener('click', () => {
+      S.theme = S.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = S.theme;
+      $('theme').textContent = S.theme === 'dark' ? 'Light' : 'Dark';
+      redraw();
+      try { localStorage.setItem('fpc-theme', S.theme); } catch (e) { /* storage blocked */ }
+    });
+    try {
+      const t = localStorage.getItem('fpc-theme');
+      if (t) { S.theme = t; root.dataset.theme = t; $('theme').textContent = t === 'dark' ? 'Light' : 'Dark'; }
+    } catch (e) { /* storage blocked */ }
+  } else {
+    // No toggle: follow the host page's theme.
+    const sync = () => { const t = themeNow(); if (t !== S.theme) { S.theme = t; redraw(); } };
+    new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    if (window.matchMedia) matchMedia('(prefers-color-scheme: light)').addEventListener('change', sync);
+  }
 
   document.querySelectorAll('#views button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
   document.querySelectorAll('#tools button').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
@@ -136,7 +151,7 @@
   $('sample').addEventListener('click', async () => {
     status('Loading sample…', true);
     const buf = await (await fetch('sample-plan.pdf')).arrayBuffer();
-    openPdf(new Uint8Array(buf), 'sample-plan');
+    openPdf(new Uint8Array(buf), 'sample-plan', true);
   });
 
   async function openFile(file) {
@@ -144,7 +159,7 @@
     const buf = new Uint8Array(await file.arrayBuffer());
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name) ||
       (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46);
-    if (isPdf) return openPdf(buf, S.fileName);
+    if (isPdf) return openPdf(buf, S.fileName, false);
     try {
       S.image = await createImageBitmap(file);
     } catch (err) {
@@ -155,9 +170,10 @@
     $('page-field').hidden = true;
     $('no-text').disabled = true;
     await loadPage(true);
+    emit('opened', { sample: false });
   }
 
-  async function openPdf(buf, name) {
+  async function openPdf(buf, name, sample) {
     S.fileName = name;
     status('Opening PDF…', true);
     try {
@@ -175,6 +191,7 @@
     $('page-field').hidden = S.pageCount < 2;
     $('no-text').disabled = false;
     await loadPage(true);
+    emit('opened', { sample: !!sample });
   }
 
   $('page').addEventListener('change', () => gotoPage(+$('page').value));
@@ -186,7 +203,7 @@
     $('page').value = n;
     if (n === S.pageNum) return;
     S.pageNum = n;
-    loadPage(true);
+    loadPage(true).then(() => emit('opened', { sample: false, page: true }));
   }
 
   // Render the current source to a grayscale working image.
@@ -240,6 +257,7 @@
     if (fresh || sizeChanged) {
       S.crop = null;
       S.strokes = [];
+      S.marks = []; S.markSel = -1;
       S.edit = new Uint8Array(S.w * S.h);
       canvas.width = S.w; canvas.height = S.h;
       S.layer = document.createElement('canvas');
@@ -253,7 +271,7 @@
       suggestDefaults();
       await autoWall();
     }
-    processNow();
+    await processNow();
   }
 
   // Scale the pixel-based defaults to the working resolution, unless the
@@ -280,20 +298,26 @@
   $('auto-wall').addEventListener('click', async () => { await autoWall(); processNow(); });
 
   // ---------- processing ----------
-  async function processNow() {
+  let lastRun = null;
+  function processNow() {
+    lastRun = runProcess();
+    return lastRun;
+  }
+  async function runProcess() {
     if (!S.gray) return;
     const id = nextId;
     S.jobId = id;
     status('Cleaning…', true);
     const gray = S.gray.slice();
     const m = await ask({ type: 'process', gray, w: S.w, h: S.h, params: params() }, [gray.buffer]);
-    if (m.id !== S.jobId) return; // a newer run superseded this one
+    if (m.id !== S.jobId) return lastRun; // a newer run superseded this one
     S.result = { ink: m.ink, walls: m.walls, openings: m.openings };
     S.final = { walls: new Uint8Array(S.w * S.h), openings: new Uint8Array(S.w * S.h) };
     paintLayer();
     redraw();
     $('dl-png').disabled = $('dl-svg').disabled = false;
     status('Ready. Use the brushes to touch up, then download.');
+    emit('processed');
   }
 
   // Apply brush edits and color the result into the layer canvas.
@@ -310,6 +334,8 @@
         if (e === 1) { fw = 0; fo = 0; }
         else if (e === 2) { fw = fw | ink[i] | fo; fo = 0; }
         else if (e === 3) { fo = (fo | ink[i]) & (fw ^ 1); }
+        else if (e === 4) fo = 0;            // erase doors/windows only
+        else if (e === 5) fw = 0;            // erase walls only
         if (fw) fo = 0;
         FW[i] = fw; FO[i] = fo;
         const j = i * 4;
@@ -327,7 +353,9 @@
     ctx.clearRect(0, 0, S.w, S.h);
     if (S.view === 'original' || S.view === 'overlay') {
       if (S.view === 'overlay') {
-        ctx.fillStyle = S.theme === 'dark' ? '#2e3440' : '#ffffff';
+        // Backdrop that contrasts with the wall color, so light walls show.
+        const wc = hex($('wallColor').value);
+        ctx.fillStyle = (wc[0] * 299 + wc[1] * 587 + wc[2] * 114) / 1000 > 128 ? '#2e3440' : '#ffffff';
         ctx.fillRect(0, 0, S.w, S.h);
         ctx.globalAlpha = 0.22;
       }
@@ -348,6 +376,21 @@
       ctx.strokeRect(c.x, c.y, c.w, c.h);
       ctx.setLineDash([]);
     }
+    S.marks.forEach((m, i) => {
+      const sel = i === S.markSel;
+      ctx.lineWidth = (sel ? 4 : 2.5) / S.zoom;
+      ctx.strokeStyle = m.color || '#ebcb8b';
+      ctx.strokeRect(m.x, m.y, m.w, m.h);
+      if (m.label != null) {
+        const fs = Math.max(14, 16 / S.zoom);
+        ctx.font = `700 ${fs}px Lato, Arial, sans-serif`;
+        const tw = ctx.measureText(m.label).width + fs * 0.6;
+        ctx.fillStyle = m.color || '#ebcb8b';
+        ctx.fillRect(m.x, m.y - fs * 1.3, tw, fs * 1.3);
+        ctx.fillStyle = '#1f232b';
+        ctx.fillText(m.label, m.x + fs * 0.3, m.y - fs * 0.3);
+      }
+    });
   }
 
   // ---------- view: zoom and pan ----------
@@ -468,6 +511,14 @@
   // Paint a stroke into the edit mask, from point index `from` (a flat
   // array offset) to its end, then repaint just the touched rectangle.
   function stamp(s, from, noPaint) {
+    if (s.rect) {
+      const c = s.rect, E = S.edit;
+      const x0 = Math.max(0, Math.round(c.x)), y0 = Math.max(0, Math.round(c.y));
+      const x1 = Math.min(S.w, Math.round(c.x + c.w)), y1 = Math.min(S.h, Math.round(c.y + c.h));
+      for (let y = y0; y < y1; y++) E.fill(s.mode, y * S.w + x0, y * S.w + x1);
+      if (!noPaint && x1 > x0 && y1 > y0) { paintLayer(x0, y0, x1, y1); redraw(); }
+      return;
+    }
     const pts = s.pts, r = s.r, r2 = r * r, E = S.edit;
     let bx0 = S.w, by0 = S.h, bx1 = 0, by1 = 0;
     const dot = (cx, cy) => {
@@ -541,6 +592,7 @@
     return S.fileName + (S.isPdf && S.pageCount > 1 ? '-p' + S.pageNum : '') + '-clean.' + ext;
   }
   function download(blob, name) {
+    if (window.FPCHooks && window.FPCHooks.save) return window.FPCHooks.save(blob, name);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -580,6 +632,38 @@
     download(new Blob([svg], { type: 'image/svg+xml' }), outName('svg'));
     status('Ready. Use the brushes to touch up, then download.');
   });
+
+  // Hooks for pages that add features on top (the Claude version).
+  function setSetting(k, v) {
+    const el = $(k);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = v;
+    S.userTouched[k] = true;
+    showValues();
+  }
+  window.FPC = {
+    S, $, status, processNow, redraw, fitView, setTool, setView, params, setSetting,
+    on(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+    setCrop(c) { S.crop = c; return processNow(); },
+    addEdit(mode, rect, tag) {
+      const s = { mode, rect, tag };
+      S.strokes.push(s);
+      stamp(s, 0);
+      return s;
+    },
+    removeEdits(pred) { S.strokes = S.strokes.filter((s) => !pred(s)); replayEdits(); },
+    setMarks(marks, sel) { S.marks = marks || []; S.markSel = sel == null ? -1 : sel; redraw(); },
+    zoomTo(r) {
+      const vr = viewport.getBoundingClientRect();
+      if (!vr.width) return;
+      S.zoom = Math.min(16, Math.min(vr.width / r.w, vr.height / r.h) * 0.6);
+      S.panX = vr.width / 2 - (r.x + r.w / 2) * S.zoom;
+      S.panY = vr.height / 2 - (r.y + r.h / 2) * S.zoom;
+      applyTransform();
+      redraw();
+    },
+  };
 
   showValues();
 })();
