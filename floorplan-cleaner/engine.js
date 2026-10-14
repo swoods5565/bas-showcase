@@ -110,8 +110,13 @@
   // Fill background runs no longer than maxLen that have foreground on both
   // ends, along rows (horizontal) and columns (vertical). This is a closing
   // with a line element and is what finds door and window openings in walls.
-  function fillGaps(mask, w, h, maxLen, horizontal) {
+  function fillGaps(mask, w, h, maxLen, horizontal, runs) {
     const out = mask.slice();
+    // With runs, only bridge between ends of walls running the same way as
+    // the gap (a doorway), not across a room between two side walls.
+    const along = runs ? (horizontal ? runs.h : runs.v) : null;
+    const cross = runs ? (horizontal ? runs.v : runs.h) : null;
+    const endOk = (i) => !runs || 1.5 * along[i] > cross[i];
     const n = horizontal ? h : w;
     const len = horizontal ? w : h;
     const step = horizontal ? 1 : w;
@@ -122,11 +127,59 @@
         const i = base + b * step;
         if (mask[i]) {
           const gap = b - lastFg - 1;
-          if (lastFg >= 0 && gap > 0 && gap <= maxLen) {
+          if (lastFg >= 0 && gap > 0 && gap <= maxLen && endOk(base + lastFg * step) && endOk(i)) {
             for (let k = lastFg + 1; k < b; k++) out[base + k * step] = 1;
           }
           lastFg = b;
         }
+      }
+    }
+    return out;
+  }
+
+  // Length of the horizontal and vertical foreground run through each pixel.
+  function runLengths(mask, w, h) {
+    const H = new Uint16Array(w * h), V = new Uint16Array(w * h);
+    for (let y = 0; y < h; y++) {
+      let x = 0;
+      while (x < w) {
+        if (!mask[y * w + x]) { x++; continue; }
+        let e = x;
+        while (e < w && mask[y * w + e]) e++;
+        const len = Math.min(65535, e - x);
+        for (let k = x; k < e; k++) H[y * w + k] = len;
+        x = e;
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      let y = 0;
+      while (y < h) {
+        if (!mask[y * w + x]) { y++; continue; }
+        let e = y;
+        while (e < h && mask[e * w + x]) e++;
+        const len = Math.min(65535, e - y);
+        for (let k = y; k < e; k++) V[k * w + x] = len;
+        y = e;
+      }
+    }
+    return { h: H, v: V };
+  }
+
+  // Separable square max filter of radius r.
+  function maxFilter(src, w, h, r) {
+    const tmp = new src.constructor(w * h), out = new src.constructor(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let m = 0;
+        for (let k = Math.max(0, x - r); k <= Math.min(w - 1, x + r); k++) if (src[y * w + k] > m) m = src[y * w + k];
+        tmp[y * w + x] = m;
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      for (let y = 0; y < h; y++) {
+        let m = 0;
+        for (let k = Math.max(0, y - r); k <= Math.min(h - 1, y + r); k++) if (tmp[k * w + x] > m) m = tmp[k * w + x];
+        out[y * w + x] = m;
       }
     }
     return out;
@@ -229,6 +282,8 @@
    *   keepOpenings   detect doors and windows
    *   dropFrame      drop wall pieces spanning most of the page (sheet border)
    *   crop           {x,y,w,h} or null
+   *   segs           vector line segments (Float32Array) or null
+   *   lineMin/lineMax gap range for walls drawn as two parallel lines, px
    * }
    * returns { ink, walls, openings }
    */
@@ -253,6 +308,29 @@
     const grown = dilate(core, w, h, r);
     let walls = new Uint8Array(w * h);
     for (let i = 0; i < walls.length; i++) walls[i] = grown[i] & solid[i];
+
+    let windowStrips = null;
+    if (p.segs && p.segs.length && p.lineMax > 0) {
+      tick('Pairing double-line walls');
+      const minT = Math.max(2, p.lineMin || 3);
+      const pw = pairWalls(p.segs, w, h, minT, p.lineMax, p.crop);
+      const pair = pw.mask;
+      windowStrips = pw.windows;
+      // Take in the drawn face lines too, then fill corners and end caps.
+      const near = dilate(pair, w, h, 1);
+      let lw = new Uint8Array(w * h);
+      for (let i = 0; i < lw.length; i++) lw[i] = pair[i] | (near[i] & ink[i]);
+      lw = fillPockets(lw, ink, w, h, 3 * p.lineMax * p.lineMax, 2 * p.lineMax);
+      if (p.crop) {
+        const c = p.crop;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (x < c.x || y < c.y || x >= c.x + c.w || y >= c.y + c.h) lw[y * w + x] = 0;
+          }
+        }
+      }
+      for (let i = 0; i < walls.length; i++) walls[i] |= lw[i];
+    }
     // Mend hairline breaks where lighter linework crosses a wall.
     const mend = Math.max(2, Math.round(p.minWall / 2));
     walls = fillGaps(fillGaps(walls, w, h, mend, true), w, h, mend, false);
@@ -275,22 +353,56 @@
     let openings = new Uint8Array(w * h);
     if (p.keepOpenings && p.maxOpening > 0) {
       tick('Finding doors and windows');
-      const gh = fillGaps(walls, w, h, p.maxOpening, true);
-      const gv = fillGaps(walls, w, h, p.maxOpening, false);
+      const runs = runLengths(walls, w, h);
+      const gh = fillGaps(walls, w, h, p.maxOpening, true, runs);
+      const gv = fillGaps(walls, w, h, p.maxOpening, false, runs);
       // A real opening is a slot about one wall thick, filled along the wall
       // direction. Filled regions thick in the other direction too are
       // corridors or closets, so each direction is checked on its own.
+      // slotLen holds each slot's width along the wall.
       const gaps = new Uint8Array(w * h);
-      const slot = Math.max(6, 5 * p.minWall);
+      const slotLen = new Uint16Array(w * h);
+      const slot = Math.max(6, 5 * p.minWall, 1.3 * (p.segs ? p.lineMax || 0 : 0));
       for (const [g, horiz] of [[gh, true], [gv, false]]) {
         for (let i = 0; i < g.length; i++) g[i] &= walls[i] ^ 1;
         components(g, w, h, (pix, n, bb) => {
           const across = horiz ? bb.maxY - bb.minY + 1 : bb.maxX - bb.minX + 1;
           if (across > slot) return;
-          for (let k = 0; k < n; k++) gaps[pix[k]] = 1;
+          const len = Math.min(65535, horiz ? bb.maxX - bb.minX + 1 : bb.maxY - bb.minY + 1);
+          for (let k = 0; k < n; k++) { gaps[pix[k]] = 1; if (len > slotLen[pix[k]]) slotLen[pix[k]] = len; }
         });
       }
-      const nearGap = dilate(gaps, w, h, Math.max(3, r + 3));
+      // Openings known from the vector drawing: windows drawn inside a wall
+      // and door swings.
+      const depth = Math.max(5 * p.minWall, p.segs ? 1.3 * p.lineMax : 0);
+      if (p.arcs && p.arcs.length) {
+        const ds = doorSlots(p.arcs, walls, ink, w, h, depth);
+        const doors = ds.slots;
+        for (let i = 0; i < doors.length; i++) if (ds.swing[i] && ink[i]) openings[i] = 1;
+        for (let i = 0; i < doors.length; i++) {
+          if (doors[i]) { walls[i] = 0; gaps[i] = 1; }
+        }
+        // Each door strip's length is its arc radius.
+        for (let a = 0; a < p.arcs.length; a += 7) {
+          const cx = Math.round(p.arcs[a]), cy = Math.round(p.arcs[a + 1]), rr = Math.ceil(p.arcs[a + 2]) + 2;
+          for (let y = Math.max(0, cy - rr); y <= Math.min(h - 1, cy + rr); y++) {
+            for (let x = Math.max(0, cx - rr); x <= Math.min(w - 1, cx + rr); x++) {
+              const i = y * w + x;
+              if (doors[i] && slotLen[i] < rr) slotLen[i] = rr;
+            }
+          }
+        }
+      }
+      if (windowStrips) {
+        for (let i = 0; i < windowStrips.length; i++) {
+          if (windowStrips[i] && !walls[i]) {
+            gaps[i] = 1;
+            if (ink[i]) openings[i] = 1;
+          }
+        }
+      }
+      const reach = Math.max(3, r + 3);
+      const nearLen = maxFilter(slotLen, w, h, reach);
       const wallPad = dilate(walls, w, h, 1);
       const thin = new Uint8Array(w * h);
       for (let i = 0; i < thin.length; i++) thin[i] = ink[i] & (wallPad[i] ^ 1);
@@ -299,9 +411,17 @@
         if (n < 4) return;
         const bw = bb.maxX - bb.minX + 1, bh = bb.maxY - bb.minY + 1;
         if (bw > maxSpan || bh > maxSpan) return;
-        let hits = 0;
-        for (let k = 0; k < n; k++) if (nearGap[pix[k]]) hits++;
+        let hits = 0, L = 0;
+        for (let k = 0; k < n; k++) {
+          const v = nearLen[pix[k]];
+          if (v) { hits++; if (v > L) L = v; }
+        }
         if (hits < 2) return;
+        // A door swing or window is about as big as its opening; furniture
+        // that merely touches a window is not.
+        if (Math.max(bw, bh) > 1.3 * L + 2 * reach) return;
+        // Text and small symbols beside an opening are much smaller than it.
+        if (Math.max(bw, bh) < 0.3 * L) return;
         for (let k = 0; k < n; k++) openings[pix[k]] = 1;
       });
       // Ink that sits inside the wall line of an opening (window sills,
@@ -312,6 +432,243 @@
     }
 
     return { ink, walls, openings };
+  }
+
+  // Fill a convex polygon (flat x,y list) into a mask.
+  function fillConvex(mask, w, h, pts) {
+    let y0 = Infinity, y1 = -Infinity;
+    for (let i = 1; i < pts.length; i += 2) { if (pts[i] < y0) y0 = pts[i]; if (pts[i] > y1) y1 = pts[i]; }
+    y0 = Math.max(0, Math.floor(y0)); y1 = Math.min(h - 1, Math.ceil(y1));
+    const n = pts.length / 2;
+    for (let y = y0; y <= y1; y++) {
+      const yc = y + 0.5;
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < n; i++) {
+        const ax = pts[2 * i], ay = pts[2 * i + 1];
+        const bx = pts[(2 * i + 2) % pts.length], by = pts[(2 * i + 3) % pts.length];
+        if ((ay <= yc && by >= yc) || (by <= yc && ay >= yc)) {
+          const x = ay === by ? Math.min(ax, bx) : ax + (bx - ax) * (yc - ay) / (by - ay);
+          const x2 = ay === by ? Math.max(ax, bx) : x;
+          if (x < lo) lo = x; if (x2 > hi) hi = x2;
+        }
+      }
+      if (hi < lo) continue;
+      const xa = Math.max(0, Math.round(lo)), xb = Math.min(w - 1, Math.round(hi));
+      for (let x = xa; x <= xb; x++) mask[y * w + x] = 1;
+    }
+  }
+
+  /* Walls drawn as two parallel lines (CAD style), from vector segments.
+   * segs: Float32Array x1,y1,x2,y2 in pixels. A pair of parallel segments
+   * minT..maxT apart that run alongside each other long enough is a wall;
+   * the strip between them is filled. A pair with a third parallel line
+   * just outside it at the same spacing is a repeating pattern (stair
+   * treads, hatching), not a wall.
+   */
+  function pairWalls(segs, w, h, minT, maxT, crop) {
+    const mask = new Uint8Array(w * h);
+    const windows = new Uint8Array(w * h);
+    const n = segs.length / 4;
+    const BUCKETS = 180;
+    const byBucket = Array.from({ length: BUCKETS }, () => []);
+    const ang = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x1 = segs[4 * i], y1 = segs[4 * i + 1], x2 = segs[4 * i + 2], y2 = segs[4 * i + 3];
+      if (Math.hypot(x2 - x1, y2 - y1) < minT) continue;
+      if (crop) {
+        const inside = (x, y) => x >= crop.x && x <= crop.x + crop.w && y >= crop.y && y <= crop.y + crop.h;
+        if (!inside(x1, y1) && !inside(x2, y2)) continue;
+      }
+      let a = Math.atan2(y2 - y1, x2 - x1);
+      if (a < 0) a += Math.PI;
+      if (a >= Math.PI) a -= Math.PI;
+      ang[i] = a;
+      // Buckets are centred on whole degrees so axis-aligned walls stay exact.
+      byBucket[Math.round(a / Math.PI * BUCKETS) % BUCKETS].push(i);
+    }
+    const stats = new Float64Array(Math.ceil(maxT) + 2);
+    for (let b = 0; b < BUCKETS; b++) {
+      // Group this bucket with its neighbours so near-parallel lines meet.
+      const ids = byBucket[b].concat(byBucket[(b + 1) % BUCKETS], byBucket[(b + BUCKETS - 1) % BUCKETS]);
+      if (!byBucket[b].length || ids.length < 2) continue;
+      const ca = b / BUCKETS * Math.PI;
+      const ux = Math.cos(ca), uy = Math.sin(ca), nx = -uy, ny = ux;
+      const own = byBucket[b].length;
+      const g = ids.map((i, idx) => {
+        const x1 = segs[4 * i], y1 = segs[4 * i + 1], x2 = segs[4 * i + 2], y2 = segs[4 * i + 3];
+        const t1 = x1 * ux + y1 * uy, t2 = x2 * ux + y2 * uy;
+        return { i, o: ((x1 + x2) * nx + (y1 + y2) * ny) / 2, t0: Math.min(t1, t2), t1: Math.max(t1, t2), own: idx < own };
+      });
+      g.sort((p, q) => p.o - q.o);
+      const overlapLen = (p, a0, a1) => Math.min(p.t1, a1) - Math.max(p.t0, a0);
+      for (let i = 0; i < g.length; i++) {
+        const A = g[i];
+        if (!A.own) continue; // each pair is handled once, in its own bucket
+        for (let j = i + 1; j < g.length; j++) {
+          const B = g[j];
+          const sep = B.o - A.o;
+          if (sep > maxT) break;
+          if (sep < minT) continue;
+          const a0 = Math.max(A.t0, B.t0), a1 = Math.min(A.t1, B.t1);
+          const len = a1 - a0;
+          if (len < Math.max(1.5 * sep, 3 * minT)) continue;
+          // A wall's two faces have nothing parallel between them. Lines
+          // between them along part of the run are a window drawn in the
+          // wall; lines between them all along are something else (a door
+          // leaf lying beside a wall, for example).
+          const inner = [];
+          for (let k = i + 1; k < j; k++) {
+            if (g[k].o - A.o > 0.5 && B.o - g[k].o > 0.5 && overlapLen(g[k], a0, a1) > 0) {
+              inner.push([Math.max(g[k].t0, a0), Math.min(g[k].t1, a1)]);
+            }
+          }
+          inner.sort((p, q) => p[0] - q[0]);
+          const glass = [];
+          for (const iv of inner) {
+            const last = glass[glass.length - 1];
+            if (last && iv[0] <= last[1] + 1) last[1] = Math.max(last[1], iv[1]);
+            else glass.push(iv.slice());
+          }
+          let covered = 0;
+          for (const iv of glass) covered += iv[1] - iv[0];
+          if (covered > 0.98 * len) continue;
+          // Repeating pattern check, just outside either line.
+          let repeated = false;
+          const win = sep * 1.2;
+          for (let k = i - 1; k >= 0 && A.o - g[k].o <= win; k--) {
+            if (A.o - g[k].o > 0.5 && overlapLen(g[k], a0, a1) > 0.5 * len) { repeated = true; break; }
+          }
+          for (let k = j + 1; !repeated && k < g.length && g[k].o - B.o <= win; k++) {
+            if (g[k].o - B.o > 0.5 && overlapLen(g[k], a0, a1) > 0.5 * len) repeated = true;
+          }
+          if (repeated) continue;
+          stats[Math.round(sep)] += len;
+          const strip = (target, s0, s1) => fillConvex(target, w, h, [
+            s0 * ux + A.o * nx, s0 * uy + A.o * ny,
+            s1 * ux + A.o * nx, s1 * uy + A.o * ny,
+            s1 * ux + B.o * nx, s1 * uy + B.o * ny,
+            s0 * ux + B.o * nx, s0 * uy + B.o * ny,
+          ]);
+          let at = a0;
+          for (const iv of glass) {
+            if (iv[0] > at) strip(mask, at, iv[0]);
+            strip(windows, iv[0], iv[1]);
+            at = Math.max(at, iv[1]);
+          }
+          if (a1 > at) strip(mask, at, a1);
+        }
+      }
+    }
+    for (let i = 0; i < mask.length; i++) if (mask[i]) windows[i] = 0;
+    return { mask, windows, stats };
+  }
+
+  /* Door swings from vector arcs. The arc's centre is the hinge; the arc
+   * end that lies along the wall marks the far jamb. The strip from hinge
+   * to jamb, one wall deep on the side away from the swing, is the opening.
+   * Returns a mask of those strips.
+   */
+  function doorSlots(arcs, walls, ink, w, h, depth) {
+    const out = new Uint8Array(w * h);
+    const swing = new Uint8Array(w * h); // pixels along the arc and the leaf
+    const dot = (x, y) => {
+      for (let yy = Math.round(y) - 2; yy <= Math.round(y) + 2; yy++) {
+        for (let xx = Math.round(x) - 2; xx <= Math.round(x) + 2; xx++) {
+          if (xx >= 0 && yy >= 0 && xx < w && yy < h) swing[yy * w + xx] = 1;
+        }
+      }
+    };
+    const at = (x, y) => {
+      x = Math.round(x); y = Math.round(y);
+      return x >= 0 && y >= 0 && x < w && y < h ? y * w + x : -1;
+    };
+    for (let a = 0; a < arcs.length; a += 7) {
+      const cx = arcs[a], cy = arcs[a + 1], r = arcs[a + 2];
+      const ends = [[arcs[a + 3], arcs[a + 4]], [arcs[a + 5], arcs[a + 6]]];
+      let best = null, bestScore = -1;
+      for (let e = 0; e < 2; e++) {
+        const [ex, ey] = ends[e], [fx, fy] = ends[1 - e];
+        const dx = (ex - cx) / r, dy = (ey - cy) / r;
+        let nx = -dy, ny = dx;
+        // Point the normal away from the swing (towards the wall).
+        if ((fx - cx) * nx + (fy - cy) * ny > 0) { nx = -nx; ny = -ny; }
+        let score = 0;
+        for (let t = 0.1; t < 0.95; t += 0.1) {
+          for (let q = 2; q <= depth; q += 2) {
+            const i = at(cx + dx * r * t + nx * q, cy + dy * r * t + ny * q);
+            if (i >= 0) score += walls[i] * 2 + ink[i];
+          }
+        }
+        if (score > bestScore) { bestScore = score; best = { dx, dy, nx, ny, fx, fy }; }
+      }
+      const { dx, dy, nx, ny, fx, fy } = best;
+      // Arc from one end to the other the short way, then the leaf.
+      const a0 = Math.atan2(arcs[a + 4] - cy, arcs[a + 3] - cx);
+      let da = Math.atan2(arcs[a + 6] - cy, arcs[a + 5] - cx) - a0;
+      if (da > Math.PI) da -= 2 * Math.PI;
+      if (da < -Math.PI) da += 2 * Math.PI;
+      const steps = Math.ceil(Math.abs(da) * r);
+      for (let k = 0; k <= steps; k++) {
+        const t = a0 + da * k / steps;
+        dot(cx + r * Math.cos(t), cy + r * Math.sin(t));
+      }
+      const ls = Math.ceil(r);
+      for (let k = 0; k <= ls; k++) dot(cx + (fx - cx) * k / ls, cy + (fy - cy) * k / ls);
+      const p = (t, q) => [cx + dx * t + nx * q, cy + dy * t + ny * q];
+      fillConvex(out, w, h, [...p(-1, -2), ...p(r + 1, -2), ...p(r + 1, depth), ...p(-1, depth)]);
+    }
+    return { slots: out, swing };
+  }
+
+  // Fill small background pockets that touch walls on most sides: the
+  // corner and T-junction squares and end caps that line pairing misses.
+  function fillPockets(walls, ink, w, h, maxArea, maxSpan) {
+    const solid = new Uint8Array(w * h);
+    for (let i = 0; i < solid.length; i++) solid[i] = walls[i] | ink[i];
+    const bg = new Uint8Array(w * h);
+    for (let i = 0; i < bg.length; i++) bg[i] = solid[i] ^ 1;
+    const out = walls.slice();
+    const near = dilate(walls, w, h, 2);
+    components4(bg, w, h, (pix, n, bb) => {
+      if (n > maxArea) return;
+      if (bb.maxX - bb.minX + 1 > maxSpan || bb.maxY - bb.minY + 1 > maxSpan) return;
+      let touch = 0;
+      for (let k = 0; k < n; k++) if (near[pix[k]]) touch++;
+      if (touch < 0.3 * n) return;
+      for (let k = 0; k < n; k++) out[pix[k]] = 1;
+    }, maxArea);
+    return out;
+  }
+
+  // 4-connected components with an early size cap (big regions are skipped
+  // without collecting all their pixels).
+  function components4(mask, w, h, visit, cap) {
+    const seen = new Uint8Array(w * h);
+    let stack = new Int32Array(1 << 16);
+    const pix = new Int32Array(cap + 1);
+    for (let s = 0; s < mask.length; s++) {
+      if (!mask[s] || seen[s]) continue;
+      let sp = 0, n = 0, big = false;
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      stack[sp++] = s; seen[s] = 1;
+      while (sp) {
+        const i = stack[--sp];
+        if (n <= cap) pix[n] = i; else big = true;
+        n++;
+        const x = i % w, y = (i - x) / w;
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1];
+        for (const j of nb) {
+          if (j >= 0 && mask[j] && !seen[j]) {
+            seen[j] = 1;
+            if (sp === stack.length) { const t = new Int32Array(stack.length * 2); t.set(stack); stack = t; }
+            stack[sp++] = j;
+          }
+        }
+      }
+      if (!big) visit(pix, n, { minX, minY, maxX, maxY });
+    }
   }
 
   // Trace a binary mask into closed polygons along pixel edges, then
@@ -419,8 +776,9 @@
   }
 
   const api = {
-    distInside, distOutside, dilate, erode, fillGaps, components, toInk,
+    distInside, distOutside, dilate, erode, fillGaps, components, toInk, runLengths, maxFilter,
     estimateWallThickness, processPlan, traceMask, simplifyClosed, loopsToPath,
+    fillConvex, pairWalls, doorSlots, fillPockets, components4,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.FPEngine = api;
