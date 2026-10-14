@@ -50,6 +50,8 @@
       return;
     }
     refreshButtons();
+    // A file opened before Claude was ready still gets its plan found.
+    if (pendingFind && ui.auto.checked) { pendingFind = false; findPlan(true); }
   });
 
   use('db').then((d) => {
@@ -76,10 +78,14 @@
   ['undo', 'clear-edits'].forEach((id) => $(id).addEventListener('click', () => setTimeout(refreshButtons, 0)));
 
   // A new page clears what Claude said about the old one.
+  let pendingFind = false;
   F.on('opened', (info) => {
     clearOut();
     refreshButtons();
-    if (!info.sample && ui.auto.checked && sample && maxImages && S.isPdf) findPlan(true);
+    if (!S.isPdf) say('This is an image, so walls can only be found from its pixels. A PDF of the same sheet gives much better walls and doors.');
+    if (info.sample || !ui.auto.checked) return;
+    if (sample && maxImages) findPlan(true);
+    else pendingFind = true;
   });
 
   // ---------- messages ----------
@@ -276,6 +282,7 @@ Use the 0-1000 ruler units. Make the plan box generous: include a little empty p
     const card = el('div', 'ai-card');
     card.append(el('p', '', 'Cropped to the plan.' + (note ? ' ' + note : '')));
     if (ex.length) card.append(el('p', 'muted small', 'Also left out inside the crop: ' + ex.map((e) => e.what).join(', ') + '.'));
+    if (!S.isPdf) card.append(el('p', 'muted small', 'This is an image, so walls can only be found from its pixels. A PDF of the same sheet gives much better walls and doors.'));
     const row = el('div', 'row');
     row.append(btn('Undo crop', async () => {
       F.removeEdits((s) => s.tag === 'auto');
