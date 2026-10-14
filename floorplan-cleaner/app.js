@@ -46,13 +46,14 @@
   }
 
   // ---------- controls ----------
-  const sliders = ['threshold', 'minWall', 'joinGap', 'minWallArea', 'maxOpening', 'pad'];
-  const units = { threshold: '', minWall: ' px', joinGap: ' px', minWallArea: ' px²', maxOpening: ' px', pad: ' px' };
+  const sliders = ['threshold', 'minWall', 'lineMax', 'joinGap', 'minWallArea', 'maxOpening', 'pad'];
+  const units = { threshold: '', minWall: ' px', lineMax: ' px', joinGap: ' px', minWallArea: ' px²', maxOpening: ' px', pad: ' px' };
   function showValues() {
     for (const k of sliders) $(k + '-out').textContent = $(k).value + units[k];
     $('res-out').textContent = '';
   }
   function params() {
+    const useVec = !!(S.vec && S.vec.segs.length && $('useVec').checked);
     return {
       threshold: +$('threshold').value,
       minWall: +$('minWall').value,
@@ -62,6 +63,10 @@
       keepOpenings: $('keepOpenings').checked,
       dropFrame: $('dropFrame').checked && !S.crop,
       crop: S.crop,
+      segs: useVec ? S.vec.segs : null,
+      arcs: useVec ? S.vec.arcs : null,
+      lineMin: Math.max(3, Math.round(Math.max(S.w, S.h) / 800)),
+      lineMax: +$('lineMax').value,
     };
   }
 
@@ -79,7 +84,7 @@
       scheduleProcess();
     });
   }
-  for (const k of ['keepOpenings', 'dropFrame']) $(k).addEventListener('change', scheduleProcess);
+  for (const k of ['keepOpenings', 'dropFrame', 'useVec']) $(k).addEventListener('change', scheduleProcess);
   $('res').addEventListener('change', () => loadPage(true));
   $('no-text').addEventListener('change', () => loadPage(false));
   $('wallColor').addEventListener('input', () => { paintLayer(); redraw(); });
@@ -208,7 +213,15 @@
       } finally {
         P.fillText = fill; P.strokeText = stroke;
       }
+      // Line work for double-line wall pairing and door swings.
+      try {
+        S.vec = await FPVector.extractSegments(page, vp, pdfjsLib);
+      } catch (err) {
+        console.warn('Could not read vector lines', err);
+        S.vec = null;
+      }
     } else {
+      S.vec = null;
       const img = S.image;
       const s = Math.min(1, target / Math.max(img.width, img.height));
       c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
@@ -248,7 +261,10 @@
   function suggestDefaults() {
     const long = Math.max(S.w, S.h);
     const set = (k, v) => { if (!S.userTouched[k]) $(k).value = Math.round(v); };
-    set('maxOpening', long / 18);
+    set('maxOpening', long / 12);
+    set('lineMax', long / 130);
+    const vec = !!(S.vec && S.vec.segs.length);
+    $('useVec-row').hidden = $('lineMax-row').hidden = !vec;
     showValues();
   }
 

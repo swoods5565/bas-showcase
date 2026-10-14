@@ -8,6 +8,7 @@
   <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="vendor/pdf.min.js"></script>
+  <script src="vector.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -58,10 +59,16 @@
           <div class="row"><input type="range" id="minWall" min="2" max="40" value="6"><button class="btn sm" id="auto-wall" title="Estimate from the drawing">Auto</button></div>
           <small>Strokes thinner than this are not walls.</small>
         </label>
+        <label class="check" id="useVec-row"><input type="checkbox" id="useVec" checked> Read wall lines from the PDF</label>
+        <label class="field" id="lineMax-row">
+          <span>Double-line wall, widest <output id="lineMax-out"></output></span>
+          <input type="range" id="lineMax" min="4" max="80" value="30">
+          <small>For CAD drawings with walls drawn as two thin lines. Set it a little wider than the thickest wall.</small>
+        </label>
         <label class="field">
-          <span>Join double-line walls <output id="joinGap-out"></output></span>
+          <span>Join double-line walls (scans) <output id="joinGap-out"></output></span>
           <input type="range" id="joinGap" min="0" max="30" value="0">
-          <small>For walls drawn as two thin lines. Fills the space between them.</small>
+          <small>For scanned plans with walls drawn as two thin lines. Fills the space between them.</small>
         </label>
         <label class="field">
           <span>Smallest wall piece <output id="minWallArea-out"></output></span>
@@ -72,7 +79,7 @@
         <label class="check"><input type="checkbox" id="keepOpenings" checked> Keep doors and windows</label>
         <label class="field">
           <span>Widest door / window <output id="maxOpening-out"></output></span>
-          <input type="range" id="maxOpening" min="10" max="600" value="200">
+          <input type="range" id="maxOpening" min="10" max="800" value="300">
           <small>Bigger gaps in walls are not treated as openings.</small>
         </label>
       </section>
