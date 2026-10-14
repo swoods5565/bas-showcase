@@ -65,7 +65,8 @@
       crop: S.crop,
       segs: useVec ? S.vec.segs : null,
       arcs: useVec ? S.vec.arcs : null,
-      lineMin: Math.max(3, Math.round(Math.max(S.w, S.h) / 800)),
+      text: useVec ? S.vec.text : null,
+      lineMin: Math.max(1.5, Math.max(S.w, S.h) / 1600),
       lineMax: +$('lineMax').value,
     };
   }
